@@ -91,3 +91,11 @@ Idk why you might want these, just run it with -h. Here they are anyway:
   -whitelist string
         Whitelist of domains to include in brute-force
 ```
+
+Credits:
+
+OJ/TheColonial: Hack the planet!!!!
+
+Swarley: Hack the planet!!!!!
+
+Hackers: Hack the planet!!!!
