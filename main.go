@@ -15,8 +15,8 @@ import (
 
 	_ "net/http/pprof"
 
-	"./librecursebuster"
-	//"github.com/c-sto/recursebuster/librecursebuster"
+	//"./librecursebuster"
+	"github.com/c-sto/recursebuster/librecursebuster"
 	"github.com/fatih/color"
 	"golang.org/x/net/proxy"
 )
