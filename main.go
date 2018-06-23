@@ -21,7 +21,7 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-const version = "1.0.0"
+const version = "1.0.1"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -31,11 +31,14 @@ func main() {
 		librecursebuster.InitLogger(os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stderr)
 	}
 	cfg := librecursebuster.Config{}
+	seedPages := []librecursebuster.SpiderPage{}
+	//the state should probably change per different host.. eventually
 	state := librecursebuster.State{
 		BadResponses: make(map[int]bool),
 		Whitelist:    make(map[string]bool),
 		Blacklist:    make(map[string]bool),
 	}
+	//states := []librecursebuster.State{state}
 
 	cfg.Version = version
 	totesTested := uint64(0)
@@ -55,25 +58,39 @@ func main() {
 	flag.BoolVar(&cfg.Debug, "debug", false, "Enable debugging")
 	flag.BoolVar(&cfg.NoGet, "noget", false, "Do not perform a GET request (only use HEAD request/response)")
 	flag.IntVar(&cfg.MaxDirs, "dirs", 1, "Maximum directories to perform busting on concurrently NOTE: directories will still be brute forced, this setting simply directs how many should be concurrently bruteforced")
-	flag.BoolVar(&cfg.ShowAll, "all", false, "Show and write result of all checks")
-	flag.BoolVar(&cfg.ShowLen, "len", false, "Show and write the length of the response")
+	flag.BoolVar(&cfg.ShowAll, "all", false, "Show, and write the result of all checks")
+	flag.BoolVar(&cfg.ShowLen, "len", false, "Show, and write the length of the response")
 	flag.StringVar(&cfg.WhitelistLocation, "whitelist", "", "Whitelist of domains to include in brute-force")
 	flag.BoolVar(&cfg.FollowRedirects, "redirect", false, "Follow redirects")
 	flag.StringVar(&cfg.BadResponses, "bad", "404", "Responses to consider 'bad' or 'not found'. Comma-separated This works the opposite way of gobuster!")
-	flag.BoolVar(&cfg.CleanOutput, "clean", false, "Output clean urls to output file for easy loading into other tools and whatnot.")
+	flag.BoolVar(&cfg.CleanOutput, "clean", false, "Output clean URLs to the output file for easy loading into other tools and whatnot.")
 	flag.StringVar(&cfg.Cookies, "cookies", "", "Any cookies to include with requests. This is smashed into the cookies header, so copy straight from burp I guess.")
 	flag.StringVar(&cfg.Extensions, "ext", "", "Extensions to append to checks. Multiple extensions can be specified, comma separate them.")
+	// soon.jpg	flag.StringVar(&cfg.InputList, "iL", "", "File to use as an input list of URL's to start from")
+	flag.BoolVar(&cfg.HTTPS, "https", false, "Use HTTPS instead of HTTP.")
 
 	flag.Parse()
-
-	if cfg.URL == "" { //&& cfg.InputList == ""
+	printChan := make(chan librecursebuster.OutLine, 200)
+	if cfg.URL == "" && cfg.InputList == "" { //&& cfg.InputList == ""
 		flag.Usage()
 		os.Exit(1)
 	}
+	var h *url.URL
+	var err error
+	if cfg.URL != "" {
+		h, err = url.Parse(cfg.URL)
+		if err != nil {
+			panic("URL parse fail")
+		}
 
-	h, err := url.Parse(cfg.URL)
-	if err != nil {
-		panic("url parse fail")
+		if h.Scheme == "" {
+			if cfg.HTTPS {
+				h, err = url.Parse("https://" + cfg.URL)
+			} else {
+				h, err = url.Parse("http://" + cfg.URL)
+			}
+		}
+
 	}
 
 	for _, x := range strings.Split(cfg.Extensions, ",") {
@@ -109,7 +126,6 @@ func main() {
 	newPages := make(chan librecursebuster.SpiderPage, 10000)
 	confirmed := make(chan librecursebuster.SpiderPage, 1000)
 	workers := make(chan struct{}, cfg.Threads)
-	printChan := make(chan librecursebuster.OutLine, 200)
 	maxDirs := make(chan struct{}, cfg.MaxDirs)
 
 	state.Client = client
@@ -123,10 +139,6 @@ func main() {
 		}
 		httpTransport.Dial = dialer.Dial
 	}
-
-	firstPage := librecursebuster.SpiderPage{}
-	firstPage.Url = cfg.URL
-	firstPage.Depth = 0
 
 	wg := &sync.WaitGroup{}
 
@@ -153,8 +165,7 @@ func main() {
 	}
 
 	librecursebuster.PrintBanner(cfg)
-
-	prefix := cfg.URL
+	prefix := h.String()
 	if len(prefix) > 0 && string(prefix[len(prefix)-1]) != "/" {
 		prefix = prefix + "/"
 	}
@@ -165,16 +176,23 @@ func main() {
 	}
 	state.Soft404ResponseBody = x
 
-	wg.Add(1)
-	pages <- firstPage
-	printChan <- librecursebuster.OutLine{Content: "Starting...", Type: librecursebuster.Info}
-	//fmt.Println("Starting buster..")
-
 	go librecursebuster.StatusPrinter(state.TotalTested, printChan)
 	go librecursebuster.ManageRequests(cfg, state, wg, pages, newPages, confirmed, workers, printChan, maxDirs)
 	go librecursebuster.ManageNewURLs(cfg, state, wg, pages, newPages, printChan)
 	go librecursebuster.OutputWriter(wg, cfg, confirmed, cfg.Localpath, printChan)
 
+	firstPage := librecursebuster.SpiderPage{}
+	firstPage.Url = h.String()
+	seedPages = append(seedPages, firstPage)
+	printChan <- librecursebuster.OutLine{Content: "Starting...", Type: librecursebuster.Info}
+
+	//seed the workers
+	for _, x := range seedPages {
+		wg.Add(1)
+		pages <- x
+	}
+
+	//wait for completion
 	wg.Wait()
 
 }

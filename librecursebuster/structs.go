@@ -102,10 +102,11 @@ type Config struct {
 	CleanOutput       bool
 	Cookies           string
 	Extensions        string
+	InputList         string
+	HTTPS             bool
 }
 
 type SpiderPage struct {
 	Url    string
-	Depth  int
 	Result *http.Response
 }

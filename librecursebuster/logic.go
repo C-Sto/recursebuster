@@ -25,7 +25,7 @@ func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages
 
 		workers <- struct{}{}
 		wg.Add(1)
-		go testURL(cfg, state, wg, page.Url, state.Client, page.Depth, newPages, workers, confirmed, printChan)
+		go testURL(cfg, state, wg, page.Url, state.Client, newPages, workers, confirmed, printChan)
 
 		if cfg.Wordlist != "" && string(page.Url[len(page.Url)-1]) == "/" { //if we are testing a directory
 
@@ -66,7 +66,6 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 		if len(u.Host) == 0 {
 			u.Host = state.ParsedURL.Host
 		}
-
 		actualUrl := state.ParsedURL.Scheme + "://" + u.Host
 
 		//path.Clean removes trailing /, so we need to add it in again after cleaning (removing dots etc) :rolling eyes emoji:
@@ -126,7 +125,7 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 }
 
 func testURL(cfg Config, state State, wg *sync.WaitGroup, urlString string, client *http.Client,
-	depth int, newPages chan SpiderPage, workers chan struct{},
+	newPages chan SpiderPage, workers chan struct{},
 	confirmedGood chan SpiderPage, printChan chan OutLine) {
 	defer func() {
 		wg.Done()
@@ -146,7 +145,7 @@ func testURL(cfg Config, state State, wg *sync.WaitGroup, urlString string, clie
 	}
 
 	wg.Add(1)
-	confirmedGood <- SpiderPage{Url: urlString, Depth: depth, Result: headResp}
+	confirmedGood <- SpiderPage{Url: urlString, Result: headResp}
 
 	if !cfg.NoSpider && good {
 		urls := getUrls(content, printChan)
@@ -201,10 +200,10 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 		wg.Add(1)
 		if len(state.Extensions) > 0 && state.Extensions[0] != "" {
 			for _, ext := range state.Extensions {
-				go testURL(cfg, state, wg, page.Url+word+"."+ext, state.Client, page.Depth, newPages, workers, confirmed, printChan)
+				go testURL(cfg, state, wg, page.Url+word+"."+ext, state.Client, newPages, workers, confirmed, printChan)
 			}
 		} else {
-			go testURL(cfg, state, wg, page.Url+word, state.Client, page.Depth, newPages, workers, confirmed, printChan)
+			go testURL(cfg, state, wg, page.Url+word, state.Client, newPages, workers, confirmed, printChan)
 		}
 	}
 	<-maxDirs

@@ -27,7 +27,6 @@ func HttpReq(method, path string, client *http.Client, cfg Config) (*http.Respon
 
 func evaluateURL(cfg Config, state State, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
 	success = true
-
 	headResp, _, err := HttpReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
 	if err != nil {
 		success = false

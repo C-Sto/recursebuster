@@ -6,7 +6,7 @@ I wanted a recursive directory brute forcer that was fast, and had certain featu
 
 ## Installation
 
-ye olde go get install should work. Same command to update:
+Ye olde go get install should work. Same command to update:
 
 ```
 go get -u github.com/c-sto/recursebuster
@@ -14,19 +14,19 @@ go get -u github.com/c-sto/recursebuster
 
 ## Usage
 
-I wanted it to be fairly straight forward, but scope creep etc. Basic usage is just like gobuster:
+I wanted it to be fairly straightforward, but scope creep etc. Basic usage is just like gobuster:
 
 ```
 recursebuster -u https://google.com -w wordlist.txt
 ```
 
-This will run a recursive-HEAD-spider-assissted search with a single thread on google.com using the wordlist specified above. Results will print to screen, but more importantly, will be written to a file 'busted.txt'.
+This will run a recursive-HEAD-spider-assisted search with a single thread on google.com using the wordlist specified above. Results will print to screen, but more importantly, will be written to a file 'busted.txt'.
 
 ## Features
 
 ### HEAD Based Checks
 
-For servers the support it, HEAD based checks speed up content discovery considerably, since no body is required to be transferred. The default logic is to use a HEAD reqeust to determine if something exists. If it seems to exist, a GET is sent to retreive and verify.
+For servers the support it, HEAD based checks speed up content discovery considerably, since no body is required to be transferred. The default logic is to use a HEAD request to determine if something exists. If it seems to exist, a GET is sent to retrieve and verify.
 
 ### Recursion
 
@@ -46,7 +46,7 @@ Idk why you might want these, just run it with -h. Here they are anyway:
 
 ```
   -all
-        Show and write result of all checks
+        Show, and write the result of all checks
   -bad string
         Responses to consider 'bad' or 'not found'. Comma-separated This works the opposite way of gobuster! (default "404")
   -blacklist string
@@ -54,7 +54,7 @@ Idk why you might want these, just run it with -h. Here they are anyway:
   -canary string
         Custom value to use to check for wildcards
   -clean
-        Output clean urls to output file for easy loading into other tools and whatnot.
+        Output clean URLs to the output file for easy loading into other tools and whatnot.
   -cookies string
         Any cookies to include with requests. This is smashed into the cookies header, so copy straight from burp I guess.
   -debug
@@ -63,9 +63,11 @@ Idk why you might want these, just run it with -h. Here they are anyway:
         Maximum directories to perform busting on concurrently NOTE: directories will still be brute forced, this setting simply directs how many should be concurrently bruteforced (default 1)
   -ext string
         Extensions to append to checks. Multiple extensions can be specified, comma separate them.
+  -https
+        Use HTTPS instead of HTTP.
   -k    Ignore SSL check
   -len
-        Show and write the length of the response
+        Show, and write the length of the response
   -noget
         Do not perform a GET request (only use HEAD request/response)
   -o string
@@ -85,7 +87,7 @@ Idk why you might want these, just run it with -h. Here they are anyway:
   -u string
         Url to spider
   -ua string
-        User agent to use when sending requests. (default "RecurseBuster/1.0.0")
+        User agent to use when sending requests. (default "RecurseBuster/1.0.1")
   -w string
         Wordlist to use for bruteforce. Blank for spider only
   -whitelist string
