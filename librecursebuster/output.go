@@ -13,8 +13,8 @@ import (
 func PrintBanner(cfg Config) {
 	//todo: include settings in banner
 	fmt.Println(strings.Repeat("=", 20))
-	fmt.Println("GoRecurseBuster V" + cfg.Version)
-	fmt.Println("Poorly hacked together by C_Sto")
+	fmt.Println("recursebuster V" + cfg.Version)
+	fmt.Println("Poorly hacked together by C_Sto (@C__Sto)")
 	fmt.Println("Heavy influence from Gograbber, thx Swarlz")
 	fmt.Println(strings.Repeat("=", 20))
 	if cfg.Debug {

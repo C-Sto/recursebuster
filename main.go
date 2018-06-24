@@ -20,7 +20,7 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-const version = "1.0.2"
+const version = "1.0.3"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -42,6 +42,7 @@ func main() {
 	cfg.Version = version
 	totesTested := uint64(0)
 	state.TotalTested = &totesTested
+	showVersion := true
 	flag.IntVar(&cfg.Threads, "t", 1, "Number of concurrent threads")
 	flag.StringVar(&cfg.URL, "u", "", "Url to spider")
 	flag.StringVar(&cfg.Localpath, "o", "."+string(os.PathSeparator)+"busted.txt", "Local file to dump into")
@@ -68,8 +69,15 @@ func main() {
 	// soon.jpg	flag.StringVar(&cfg.InputList, "iL", "", "File to use as an input list of URL's to start from")
 	flag.BoolVar(&cfg.HTTPS, "https", false, "Use HTTPS instead of HTTP.")
 	flag.IntVar(&cfg.VerboseLevel, "v", 0, "Verbosity level for output messages.")
+	flag.BoolVar(&showVersion, "version", false, "Show version number and exit")
 
 	flag.Parse()
+
+	if showVersion {
+		librecursebuster.PrintBanner(cfg)
+		os.Exit(0)
+	}
+
 	printChan := make(chan librecursebuster.OutLine, 200)
 	if cfg.URL == "" && cfg.InputList == "" { //&& cfg.InputList == ""
 		flag.Usage()
