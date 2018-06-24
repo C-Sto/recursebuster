@@ -16,10 +16,7 @@ func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages
 		page := <-pages
 		if state.Blacklist[page.Url] {
 			wg.Done()
-			printChan <- OutLine{
-				Content: fmt.Sprintf("Not testing blacklisted URL: %s", page.Url),
-				Type:    Info,
-			}
+			PrintOutput(fmt.Sprintf("Not testing blacklisted URL: %s", page.Url), Info, 0, wg, printChan)
 			continue
 		}
 
@@ -56,10 +53,7 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 
 		if err != nil {
 			wg.Done()
-			printChan <- OutLine{
-				Content: fmt.Sprintf("URL Parse Failed: %s %s", candidate.Url, err),
-				Type:    Error,
-			}
+			panic(err)
 			continue //probably a better way of doing this
 		}
 
@@ -131,8 +125,7 @@ func testURL(cfg Config, state State, wg *sync.WaitGroup, urlString string, clie
 		wg.Done()
 		atomic.AddUint64(state.TotalTested, 1)
 	}()
-
-	headResp, content, good := evaluateURL(cfg, state, urlString, client, workers, printChan)
+	headResp, content, good := evaluateURL(wg, cfg, state, urlString, client, workers, printChan)
 
 	if !good && !cfg.ShowAll {
 		return
@@ -148,18 +141,20 @@ func testURL(cfg Config, state State, wg *sync.WaitGroup, urlString string, clie
 	confirmedGood <- SpiderPage{Url: urlString, Result: headResp}
 
 	if !cfg.NoSpider && good {
-		urls := getUrls(content, printChan)
+		urls, err := getUrls(content, printChan)
+		if err != nil {
+			PrintOutput(err.Error(), Error, 0, wg, printChan)
+		}
 		for _, x := range urls { //add any found pages into the pool
 			//add all the directories
 			newPage := SpiderPage{}
 			newPage.Url = x
 
-			if cfg.Debug {
-				printChan <- OutLine{
-					Content: fmt.Sprintf("Found URL on page: %s", x),
-					Type:    Debug,
-				}
-			}
+			PrintOutput(
+				fmt.Sprintf("Found URL on page: %s", x),
+				Debug, 3, wg, printChan,
+			)
+
 			wg.Add(1)
 			newPages <- newPage
 		}
@@ -171,14 +166,17 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 
 	//check to make sure we aren't dirbusting a wildcardyboi
 	workers <- struct{}{}
-	_, _, res := evaluateURL(cfg, state, page.Url+RandString(printChan), state.Client, workers, printChan)
+	_, x, res := evaluateURL(wg, cfg, state, page.Url+RandString(printChan), state.Client, workers, printChan)
 
 	if res { //true response indicates a good response for a guid path, unlikely good
-		printChan <- OutLine{
-			Content: fmt.Sprintf("Wildcard repsonse detected, skipping dirbusting of %s", page.Url),
-			Type:    Info,
+		if detectSoft404(x, state.Soft404ResponseBody, cfg.Ratio404) {
+			//it's a soft404 probably, guess we can continue
+		} else {
+			PrintOutput(
+				fmt.Sprintf("Wildcard repsonse detected, skipping dirbusting of %s", page.Url),
+				Info, 0, wg, printChan)
+			return
 		}
-		return
 	}
 
 	//load in the wordlist to a channel (can probs be async)
@@ -187,10 +185,10 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 	go LoadWords(cfg.Wordlist, wordsChan, printChan) //wordlist management doesn't need waitgroups, because of the following range statement
 
 	maxDirs <- struct{}{}
-	printChan <- OutLine{
-		Content: fmt.Sprintf("Dirbusting %s", page.Url),
-		Type:    Info,
-	}
+	PrintOutput(
+		fmt.Sprintf("Dirbusting %s", page.Url),
+		Info, 0, wg, printChan,
+	)
 	for word := range wordsChan { //will receive from the channel until it's closed
 		//read words off the channel, and test it
 
@@ -207,9 +205,7 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 		}
 	}
 	<-maxDirs
-	printChan <- OutLine{
-		Content: fmt.Sprintf("Finished dirbusting: %s", page.Url),
-		Type:    Info,
-	}
+
+	PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.Url), Info, 0, wg, printChan)
 
 }

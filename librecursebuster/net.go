@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"sync"
 )
 
 func HttpReq(method, path string, client *http.Client, cfg Config) (*http.Response, []byte, error) {
@@ -25,16 +26,13 @@ func HttpReq(method, path string, client *http.Client, cfg Config) (*http.Respon
 	return resp, body, err
 }
 
-func evaluateURL(cfg Config, state State, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
+func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
 	success = true
 	headResp, _, err := HttpReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
 	if err != nil {
 		success = false
 		<-workers //done with the net thread
-		printChan <- OutLine{
-			Content: fmt.Sprintf("%s", err),
-			Type:    Error,
-		}
+		PrintOutput(fmt.Sprintf("%s", err), Error, 0, wg, printChan)
 		return
 	}
 
@@ -56,15 +54,18 @@ func evaluateURL(cfg Config, state State, urlString string, client *http.Client,
 	<-workers //done with the net thread
 	if err != nil {
 		success = false
-		printChan <- OutLine{
-			Content: fmt.Sprintf("%s", err),
-			Type:    Error,
-		}
-		return //probably handl/n
+		PrintOutput(fmt.Sprintf("%s", err), Error, 0, wg, printChan)
+
+		return //probably handle better
 	}
 
 	//check we care about it (body only) section
 	//double check that it's not 404/error using smart blockchain AI tech
+	PrintOutput(
+		fmt.Sprintf("%v, %v, %v",
+			content, state.Soft404ResponseBody,
+			detectSoft404(content, state.Soft404ResponseBody, cfg.Ratio404)),
+		Debug, 4, wg, printChan)
 	if detectSoft404(content, state.Soft404ResponseBody, cfg.Ratio404) {
 		success = false
 		//seems to be a soft 404 lol

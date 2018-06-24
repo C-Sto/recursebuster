@@ -73,24 +73,37 @@ func OutputWriter(wg *sync.WaitGroup, cfg Config, confirmed chan SpiderPage, loc
 			}
 			file.WriteString(writeS + "\n")
 			file.Sync()
-			printChan <- OutLine{
-				Content: printS,
-				Type:    Good,
-			}
+			PrintOutput(printS, Good, 0, wg, printChan)
 		}
 		wg.Done()
 	}
 }
 
-func StatusPrinter(testedTotal *uint64, printChan chan OutLine) {
+func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sync.WaitGroup, printChan chan OutLine) {
+	wg.Add(1)
+	printChan <- OutLine{
+		Content: message,
+		Type:    writer,
+		Level:   verboseLevel,
+	}
+}
+
+func StatusPrinter(cfg Config, wg *sync.WaitGroup, testedTotal *uint64, printChan chan OutLine) {
 	tick := time.NewTicker(time.Second * 2)
 	status := getStatus(testedTotal)
 	for {
 		select {
 		case o := <-printChan:
 			if o.Type != Status {
-				o.Type.Println(o.Content)
+				if o.Type == Debug {
+					if cfg.VerboseLevel >= o.Level {
+						o.Type.Println(o.Content)
+					}
+				} else {
+					o.Type.Println(o.Content)
+				}
 			}
+			wg.Done()
 		case <-tick.C:
 			status = getStatus(testedTotal)
 		}

@@ -59,8 +59,8 @@ var c = color.New(color.FgCyan, color.Bold)
 
 type OutLine struct {
 	Content string
-	//Type    *log.Logger
-	Type *ConsoleWriter
+	Level   int //Define the log/verbosity level. 0 is normal, 1 is higher verbosity etc
+	Type    *ConsoleWriter
 }
 
 //Should probably have different concepts between config and state. Configs that might change depending on the URL being queried
@@ -104,6 +104,7 @@ type Config struct {
 	Extensions        string
 	InputList         string
 	HTTPS             bool
+	VerboseLevel      int
 }
 
 type SpiderPage struct {

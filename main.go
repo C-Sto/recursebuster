@@ -15,13 +15,12 @@ import (
 
 	_ "net/http/pprof"
 
-	//"./librecursebuster"
 	"github.com/c-sto/recursebuster/librecursebuster"
 	"github.com/fatih/color"
 	"golang.org/x/net/proxy"
 )
 
-const version = "1.0.1"
+const version = "1.0.2"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -68,6 +67,7 @@ func main() {
 	flag.StringVar(&cfg.Extensions, "ext", "", "Extensions to append to checks. Multiple extensions can be specified, comma separate them.")
 	// soon.jpg	flag.StringVar(&cfg.InputList, "iL", "", "File to use as an input list of URL's to start from")
 	flag.BoolVar(&cfg.HTTPS, "https", false, "Use HTTPS instead of HTTP.")
+	flag.IntVar(&cfg.VerboseLevel, "v", 0, "Verbosity level for output messages.")
 
 	flag.Parse()
 	printChan := make(chan librecursebuster.OutLine, 200)
@@ -127,11 +127,12 @@ func main() {
 	confirmed := make(chan librecursebuster.SpiderPage, 1000)
 	workers := make(chan struct{}, cfg.Threads)
 	maxDirs := make(chan struct{}, cfg.MaxDirs)
+	wg := &sync.WaitGroup{}
 
 	state.Client = client
 	//user a proxy if requested to
 	if cfg.ProxyAddr != "" {
-		printChan <- librecursebuster.OutLine{Content: fmt.Sprintf("Proxy set to: %s", cfg.ProxyAddr), Type: librecursebuster.Info}
+		librecursebuster.PrintOutput(fmt.Sprintf("Proxy set to: %s", cfg.ProxyAddr), librecursebuster.Info, 0, wg, printChan)
 
 		dialer, err := proxy.SOCKS5("tcp", cfg.ProxyAddr, nil, proxy.Direct)
 		if err != nil {
@@ -139,8 +140,6 @@ func main() {
 		}
 		httpTransport.Dial = dialer.Dial
 	}
-
-	wg := &sync.WaitGroup{}
 
 	if cfg.BlacklistLocation != "" {
 		readerChan := make(chan string, 100)
@@ -170,13 +169,18 @@ func main() {
 		prefix = prefix + "/"
 	}
 	randURL := fmt.Sprintf("%s%s", prefix, canary)
-	_, x, err := librecursebuster.HttpReq("GET", randURL, client, cfg)
+	resp, x, err := librecursebuster.HttpReq("GET", randURL, client, cfg)
 	if err != nil {
-		panic("Canary Error, check url is correct: " + randURL)
+		panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
 	}
+	librecursebuster.PrintOutput(
+		fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
+		librecursebuster.Debug, 2, wg, printChan,
+	)
+
 	state.Soft404ResponseBody = x
 
-	go librecursebuster.StatusPrinter(state.TotalTested, printChan)
+	go librecursebuster.StatusPrinter(cfg, wg, state.TotalTested, printChan)
 	go librecursebuster.ManageRequests(cfg, state, wg, pages, newPages, confirmed, workers, printChan, maxDirs)
 	go librecursebuster.ManageNewURLs(cfg, state, wg, pages, newPages, printChan)
 	go librecursebuster.OutputWriter(wg, cfg, confirmed, cfg.Localpath, printChan)
@@ -184,7 +188,8 @@ func main() {
 	firstPage := librecursebuster.SpiderPage{}
 	firstPage.Url = h.String()
 	seedPages = append(seedPages, firstPage)
-	printChan <- librecursebuster.OutLine{Content: "Starting...", Type: librecursebuster.Info}
+
+	librecursebuster.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0, wg, printChan)
 
 	//seed the workers
 	for _, x := range seedPages {

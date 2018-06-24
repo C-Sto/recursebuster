@@ -14,11 +14,7 @@ func RandString(printChan chan OutLine) string {
 	b := make([]byte, 16)
 	_, err := rand.Read(b)
 	if err != nil {
-		printChan <- OutLine{
-			Content: fmt.Sprintf("%s", err),
-			Type:    Error,
-		}
-		return "random"
+		panic(err)
 	}
 
 	return fmt.Sprintf("%X-%X-%X-%X-%X", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
@@ -26,16 +22,12 @@ func RandString(printChan chan OutLine) string {
 }
 
 //returns a slice of strings containing urls
-func getUrls(page []byte, printChan chan OutLine) []string {
+func getUrls(page []byte, printChan chan OutLine) ([]string, error) {
 
 	ret := []string{}
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(page))
 	if err != nil {
-		printChan <- OutLine{
-			Content: fmt.Sprintf("%s", err),
-			Type:    Error,
-		}
-		return nil
+		return nil, err
 	}
 
 	doc.Find("*").Each(func(index int, item *goquery.Selection) {
@@ -46,7 +38,7 @@ func getUrls(page []byte, printChan chan OutLine) []string {
 		}
 	})
 
-	return ret
+	return ret, nil
 }
 
 func detectSoft404(a []byte, b []byte, ratio float64) bool {
