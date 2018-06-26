@@ -91,23 +91,35 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sy
 func StatusPrinter(cfg Config, wg *sync.WaitGroup, testedTotal *uint64, printChan chan OutLine) {
 	tick := time.NewTicker(time.Second * 2)
 	status := getStatus(testedTotal)
+	lastLen := 0
 	for {
+		spaces := ""
 		select {
 		case o := <-printChan:
 			if o.Type != Status {
+				spaceCount := lastLen - len(o.Content)
+				if spaceCount > 0 {
+					spaces = strings.Repeat(" ", spaceCount)
+				}
 				if o.Type == Debug {
 					if cfg.VerboseLevel >= o.Level {
-						o.Type.Println(o.Content)
+						o.Type.Println(o.Content + spaces)
 					}
 				} else {
-					o.Type.Println(o.Content)
+					o.Type.Println(o.Content + spaces)
 				}
+				lastLen = len(o.Content)
 			}
 			wg.Done()
 		case <-tick.C:
 			status = getStatus(testedTotal)
 		}
-		Status.Printf(status)
+		spaceCount := lastLen - len(status)
+		if spaceCount > 0 {
+			//spaces = strings.Repeat(" ", spaceCount)
+		}
+		Status.Printf(status + spaces + "\r")
+		lastLen = len(status)
 	}
 }
 
@@ -122,5 +134,5 @@ func getStatus(testedTotal *uint64) string {
 	persecond := testedInDuration / seconds
 	lastTick = thisTick
 	lastTested = float64(tested)
-	return fmt.Sprintf("Total Tested: %d Estimated speed: %d/s\r", tested, int64(persecond)) //this is extremely rough and probably wrong
+	return fmt.Sprintf("Total Tested: %d Estimated speed: %d/s", tested, int64(persecond)) //this is extremely rough and probably wrong
 }

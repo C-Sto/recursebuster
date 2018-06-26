@@ -53,7 +53,7 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 
 		if err != nil {
 			wg.Done()
-			panic(err)
+			PrintOutput(err.Error(), Error, 0, wg, printChan)
 			continue //probably a better way of doing this
 		}
 
