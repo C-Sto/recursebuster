@@ -88,16 +88,21 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sy
 	}
 }
 
-func StatusPrinter(cfg Config, wg *sync.WaitGroup, testedTotal *uint64, printChan chan OutLine) {
+func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
 	tick := time.NewTicker(time.Second * 2)
-	status := getStatus(testedTotal)
-	lastLen := 0
+	status := getStatus(state)
+	maxLen := 0
+	testedURL := ""
 	for {
 		spaces := ""
 		select {
 		case o := <-printChan:
 			if o.Type != Status {
-				spaceCount := lastLen - len(o.Content)
+				if maxLen < len(o.Content) {
+					maxLen = len(o.Content)
+				}
+				spaceCount := maxLen - len(o.Content)
+
 				if spaceCount > 0 {
 					spaces = strings.Repeat(" ", spaceCount)
 				}
@@ -108,31 +113,59 @@ func StatusPrinter(cfg Config, wg *sync.WaitGroup, testedTotal *uint64, printCha
 				} else {
 					o.Type.Println(o.Content + spaces)
 				}
-				lastLen = len(o.Content)
+
 			}
 			wg.Done()
 		case <-tick.C:
-			status = getStatus(testedTotal)
+			status = getStatus(state)
+		case t := <-testChan:
+			status = getStatus(state)
+			testedURL = t
+
 		}
-		spaceCount := lastLen - len(status)
+
+		sprint := fmt.Sprintf("%s %s", status, testedURL)
+		if maxLen < len(sprint) {
+			maxLen = len(sprint)
+		}
+		spaceCount := maxLen - len(sprint)
 		if spaceCount > 0 {
-			//spaces = strings.Repeat(" ", spaceCount)
+			spaces = strings.Repeat(" ", spaceCount)
 		}
-		Status.Printf(status + spaces + "\r")
-		lastLen = len(status)
+		Status.Printf(sprint + spaces + "\r")
+
 	}
 }
 
-var lastTick = time.Now()
-var lastTested = float64(0)
+func getStatus(s State) string {
 
-func getStatus(testedTotal *uint64) string {
-	tested := atomic.LoadUint64(testedTotal)
-	thisTick := time.Now()
-	seconds := time.Since(lastTick).Seconds()
-	testedInDuration := float64(tested) - lastTested
-	persecond := testedInDuration / seconds
-	lastTick = thisTick
-	lastTested = float64(tested)
-	return fmt.Sprintf("Total Tested: %d Estimated speed: %d/s", tested, int64(persecond)) //this is extremely rough and probably wrong
+	return fmt.Sprintf("Total Tested: %d Short Speed: %d/s Long Speed: %d/s",
+		atomic.LoadUint64(s.TotalTested),
+		atomic.LoadUint64(s.PerSecondShort),
+		atomic.LoadUint64(s.PerSecondLong),
+	)
+}
+
+func StatsTracker(state State) {
+	tick := time.NewTicker(time.Second * 2)
+	testedBefore := atomic.LoadUint64(state.TotalTested)
+	timeBefore := time.Now()
+	for _ = range tick.C {
+		testedNow := atomic.LoadUint64(state.TotalTested)
+
+		//calculate short average (tested since last tick)
+		testedInPeriod := testedNow - testedBefore
+		timeInPeriod := time.Since(timeBefore)
+		testedPerSecond := float64(testedInPeriod) / float64(timeInPeriod.Seconds())
+		atomic.StoreUint64(state.PerSecondShort, uint64(testedPerSecond))
+
+		//calculate long average (tested per second since start)
+		testedInPeriod = testedNow
+		timeInPeriod = time.Since(state.StartTime)
+		testedPerSecond = float64(testedInPeriod) / float64(timeInPeriod.Seconds())
+		atomic.StoreUint64(state.PerSecondLong, uint64(testedPerSecond))
+
+		testedBefore = testedNow
+		timeBefore = time.Now()
+	}
 }

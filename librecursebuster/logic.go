@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 )
 
-func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages, confirmed chan SpiderPage, workers chan struct{}, printChan chan OutLine, maxDirs chan struct{}) {
+func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages, confirmed chan SpiderPage, workers chan struct{}, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
 	//manages net request workers
 	for {
 		page := <-pages
@@ -22,14 +22,14 @@ func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages
 
 		workers <- struct{}{}
 		wg.Add(1)
-		go testURL(cfg, state, wg, page.Url, state.Client, newPages, workers, confirmed, printChan)
+		go testURL(cfg, state, wg, page.Url, state.Client, newPages, workers, confirmed, printChan, testChan)
 
 		if cfg.Wordlist != "" && string(page.Url[len(page.Url)-1]) == "/" { //if we are testing a directory
 
 			//check for wildcard response
 
 			wg.Add(1)
-			go dirBust(cfg, state, page, wg, workers, pages, newPages, confirmed, printChan, maxDirs)
+			go dirBust(cfg, state, page, wg, workers, pages, newPages, confirmed, printChan, maxDirs, testChan)
 		}
 		wg.Done()
 	}
@@ -120,11 +120,17 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 
 func testURL(cfg Config, state State, wg *sync.WaitGroup, urlString string, client *http.Client,
 	newPages chan SpiderPage, workers chan struct{},
-	confirmedGood chan SpiderPage, printChan chan OutLine) {
+	confirmedGood chan SpiderPage, printChan chan OutLine, testChan chan string) {
 	defer func() {
 		wg.Done()
 		atomic.AddUint64(state.TotalTested, 1)
 	}()
+
+	select {
+	case testChan <- urlString:
+	default: //this is to prevent blocking, it doesn't _really_ matter if it doesn't get written to output
+	}
+
 	headResp, content, good := evaluateURL(wg, cfg, state, urlString, client, workers, printChan)
 
 	if !good && !cfg.ShowAll {
@@ -161,7 +167,7 @@ func testURL(cfg Config, state State, wg *sync.WaitGroup, urlString string, clie
 	}
 }
 
-func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, workers chan struct{}, pages, newPages, confirmed chan SpiderPage, printChan chan OutLine, maxDirs chan struct{}) {
+func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, workers chan struct{}, pages, newPages, confirmed chan SpiderPage, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
 	defer wg.Done()
 
 	//check to make sure we aren't dirbusting a wildcardyboi
@@ -194,14 +200,13 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 
 		//test with as many spare threads as we can
 		workers <- struct{}{}
-		//	localWG.Add(1)
 		wg.Add(1)
 		if len(state.Extensions) > 0 && state.Extensions[0] != "" {
 			for _, ext := range state.Extensions {
-				go testURL(cfg, state, wg, page.Url+word+"."+ext, state.Client, newPages, workers, confirmed, printChan)
+				go testURL(cfg, state, wg, page.Url+word+"."+ext, state.Client, newPages, workers, confirmed, printChan, testChan)
 			}
 		} else {
-			go testURL(cfg, state, wg, page.Url+word, state.Client, newPages, workers, confirmed, printChan)
+			go testURL(cfg, state, wg, page.Url+word, state.Client, newPages, workers, confirmed, printChan, testChan)
 		}
 	}
 	<-maxDirs

@@ -20,7 +20,7 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-const version = "1.0.3"
+const version = "1.0.4"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -135,6 +135,7 @@ func main() {
 	confirmed := make(chan librecursebuster.SpiderPage, 1000)
 	workers := make(chan struct{}, cfg.Threads)
 	maxDirs := make(chan struct{}, cfg.MaxDirs)
+	testChan := make(chan string, 100)
 	wg := &sync.WaitGroup{}
 
 	state.Client = client
@@ -187,11 +188,15 @@ func main() {
 	)
 
 	state.Soft404ResponseBody = x
+	state.StartTime = time.Now()
+	state.PerSecondShort = new(uint64)
+	state.PerSecondLong = new(uint64)
 
-	go librecursebuster.StatusPrinter(cfg, wg, state.TotalTested, printChan)
-	go librecursebuster.ManageRequests(cfg, state, wg, pages, newPages, confirmed, workers, printChan, maxDirs)
+	go librecursebuster.StatusPrinter(cfg, state, wg, printChan, testChan)
+	go librecursebuster.ManageRequests(cfg, state, wg, pages, newPages, confirmed, workers, printChan, maxDirs, testChan)
 	go librecursebuster.ManageNewURLs(cfg, state, wg, pages, newPages, printChan)
 	go librecursebuster.OutputWriter(wg, cfg, confirmed, cfg.Localpath, printChan)
+	go librecursebuster.StatsTracker(state)
 
 	firstPage := librecursebuster.SpiderPage{}
 	firstPage.Url = h.String()

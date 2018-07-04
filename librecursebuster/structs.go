@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/fatih/color"
 )
@@ -68,7 +69,10 @@ type State struct {
 	ParsedURL           *url.URL
 	Client              *http.Client
 	TotalTested         *uint64
+	PerSecondShort      *uint64
+	PerSecondLong       *uint64
 	Soft404ResponseBody []byte
+	StartTime           time.Time
 	//Maps are reference types, so they are allways passed by reference.
 	Blacklist    map[string]bool
 	Whitelist    map[string]bool
