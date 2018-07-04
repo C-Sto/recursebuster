@@ -98,15 +98,11 @@ func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan O
 		select {
 		case o := <-printChan:
 			if o.Type != Status {
-				if maxLen < len(o.Content) {
-					maxLen = len(o.Content)
-				}
-
 				spaceCount := maxLen - len(o.Content)
 
 				if spaceCount > 0 {
 					if !cfg.NoStatus {
-						spaces = strings.Repeat(" ", spaceCount)
+						//spaces = strings.Repeat(" ", spaceCount)
 					}
 				}
 				if o.Type == Debug {
