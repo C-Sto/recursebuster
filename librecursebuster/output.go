@@ -101,10 +101,13 @@ func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan O
 				if maxLen < len(o.Content) {
 					maxLen = len(o.Content)
 				}
+
 				spaceCount := maxLen - len(o.Content)
 
 				if spaceCount > 0 {
-					spaces = strings.Repeat(" ", spaceCount)
+					if !cfg.NoStatus {
+						spaces = strings.Repeat(" ", spaceCount)
+					}
 				}
 				if o.Type == Debug {
 					if cfg.VerboseLevel >= o.Level {
