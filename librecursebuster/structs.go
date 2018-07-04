@@ -109,6 +109,7 @@ type Config struct {
 	InputList         string
 	HTTPS             bool
 	VerboseLevel      int
+	NoStatus          bool
 }
 
 type SpiderPage struct {

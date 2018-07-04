@@ -70,6 +70,7 @@ func main() {
 	flag.BoolVar(&cfg.HTTPS, "https", false, "Use HTTPS instead of HTTP.")
 	flag.IntVar(&cfg.VerboseLevel, "v", 0, "Verbosity level for output messages.")
 	flag.BoolVar(&showVersion, "version", false, "Show version number and exit")
+	flag.BoolVar(&cfg.NoStatus, "nostatus", false, "Don't print status info (for if it messes with the terminal)")
 
 	flag.Parse()
 

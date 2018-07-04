@@ -132,7 +132,9 @@ func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan O
 		if spaceCount > 0 {
 			spaces = strings.Repeat(" ", spaceCount)
 		}
-		Status.Printf(sprint + spaces + "\r")
+		if !cfg.NoStatus {
+			Status.Printf(sprint + spaces + "\r")
+		}
 
 	}
 }
