@@ -73,7 +73,20 @@ func OutputWriter(wg *sync.WaitGroup, cfg Config, confirmed chan SpiderPage, loc
 			}
 			file.WriteString(writeS + "\n")
 			file.Sync()
-			PrintOutput(printS, Good, 0, wg, printChan)
+			//ugh
+			x := object.Result.StatusCode
+			if 199 < x && x < 300 { //2xx
+				PrintOutput(printS, Good2, 0, wg, printChan)
+			} else if 299 < x && x < 400 { //3xx
+				PrintOutput(printS, Good3, 0, wg, printChan)
+			} else if 399 < x && x < 500 { //4xx
+				PrintOutput(printS, Good4, 0, wg, printChan)
+			} else if 499 < x && x < 600 { //5xx
+				PrintOutput(printS, Good5, 0, wg, printChan)
+			} else {
+				PrintOutput(printS, Goodx, 0, wg, printChan)
+			}
+
 		}
 		wg.Done()
 	}
@@ -123,7 +136,7 @@ func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan O
 
 		}
 
-		sprint := fmt.Sprintf("%s %s", status, testedURL)
+		sprint := fmt.Sprintf("%s"+black.Sprintf(">")+"%s", status, testedURL)
 		if maxLen < len(sprint) {
 			maxLen = len(sprint)
 		}
@@ -140,7 +153,7 @@ func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan O
 
 func getStatus(s State) string {
 
-	return fmt.Sprintf("Total Tested: %d Short Speed: %d/s Long Speed: %d/s",
+	return fmt.Sprintf("Tested: %d Speed(2s): %d/s Speed: %d/s",
 		atomic.LoadUint64(s.TotalTested),
 		atomic.LoadUint64(s.PerSecondShort),
 		atomic.LoadUint64(s.PerSecondLong),

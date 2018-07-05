@@ -25,9 +25,9 @@ const version = "1.0.4"
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
 		//can't use color.Error, because *nix etc don't have that for some reason :(
-		librecursebuster.InitLogger(color.Output, color.Output, color.Output, color.Output, color.Output, color.Output)
+		librecursebuster.InitLogger(color.Output, color.Output, color.Output, color.Output, color.Output, color.Output, color.Output, color.Output, color.Output, color.Output)
 	} else {
-		librecursebuster.InitLogger(os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stderr)
+		librecursebuster.InitLogger(os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stderr)
 	}
 	cfg := librecursebuster.Config{}
 	seedPages := []librecursebuster.SpiderPage{}
@@ -53,7 +53,7 @@ func main() {
 	flag.StringVar(&cfg.Agent, "ua", "RecurseBuster/"+version, "User agent to use when sending requests.")
 	flag.Float64Var(&cfg.Ratio404, "ratio", 0.95, "Similarity ratio to the 404 canary page.")
 	flag.StringVar(&cfg.BlacklistLocation, "blacklist", "", "Blacklist of prefixes to not check. Will not check on exact matches.")
-	flag.BoolVar(&cfg.NoSpider, "spider", false, "Search the page body for links, and directories to add to the spider queue.")
+	flag.BoolVar(&cfg.NoSpider, "nospider", false, "Don't search the page body for links, and directories to add to the spider queue.")
 	flag.IntVar(&cfg.Timeout, "timeout", 20, "Timeout (seconds) for HTTP/TCP connections")
 	flag.BoolVar(&cfg.Debug, "debug", false, "Enable debugging")
 	flag.BoolVar(&cfg.NoGet, "noget", false, "Do not perform a GET request (only use HEAD request/response)")

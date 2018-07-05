@@ -10,7 +10,12 @@ import (
 )
 
 var (
-	Good    *ConsoleWriter //*log.Logger
+	Good2 *ConsoleWriter //*log.Logger
+	Good3 *ConsoleWriter //*log.Logger
+	Good4 *ConsoleWriter //*log.Logger
+	Good5 *ConsoleWriter //*log.Logger
+	Goodx *ConsoleWriter //*log.Logger
+
 	Info    *ConsoleWriter
 	Warning *ConsoleWriter
 	Debug   *ConsoleWriter
@@ -19,31 +24,46 @@ var (
 )
 
 func InitLogger(
-	goodHandle io.Writer,
+	good2Handle io.Writer,
+	good3Handle io.Writer,
+	good4Handle io.Writer,
+	good5Handle io.Writer,
+	goodxHandle io.Writer,
 	infoHandle io.Writer,
 	debugHandle io.Writer,
 	warningHandle io.Writer,
 	statusHandle io.Writer,
 	errorHandle io.Writer) {
 
-	Good = ConsoleWriter{}.New(goodHandle, //color.New().New(goodHandle,
+	Good2 = ConsoleWriter{}.New(good2Handle, //color.New().New(goodHandle,
 		g.Sprintf("GOOD: "))
+	Good3 = ConsoleWriter{}.New(good3Handle, //color.New().New(goodHandle,
+		y.Sprintf("GOOD: "))
+	Good4 = ConsoleWriter{}.New(good4Handle, //color.New().New(goodHandle,
+		c.Sprintf("GOOD: "))
+	Good5 = ConsoleWriter{}.New(good5Handle, //color.New().New(goodHandle,
+		b.Sprintf("GOOD: "))
+	Goodx = ConsoleWriter{}.New(goodxHandle, //color.New().New(goodHandle,
+		m.Sprintf("GOOD: "))
+
+	//Good_2xx = Green
+	//Good_3xx = Yellow
+	//Good_4xx = Cyan
+	//Good_5xx = Blue
+	//Good_xxx = Magenta
+
 	//log.Ldate|log.Ltime)
 
 	Info = ConsoleWriter{}.New(infoHandle,
-		b.Sprintf("INFO: "))
+		w.Sprintf("INFO: "))
 	//log.Ldate|log.Ltime)
 
 	Debug = ConsoleWriter{}.New(debugHandle,
 		y.Sprintf("DEBUG: "))
 	//log.Ldate|log.Ltime)
 
-	Warning = ConsoleWriter{}.New(warningHandle,
-		m.Sprintf("WARNING: "))
-	//log.Ldate|log.Ltime)
-
 	Status = ConsoleWriter{}.New(statusHandle,
-		c.Sprintf(">"))
+		black.Sprintf(">"))
 	//log.Ldate|log.Ltime)
 
 	Error = ConsoleWriter{}.New(errorHandle,
@@ -51,12 +71,14 @@ func InitLogger(
 	//log.Ldate|log.Ltime)
 }
 
-var g = color.New(color.FgGreen, color.Bold)
-var y = color.New(color.FgYellow, color.Bold)
-var r = color.New(color.FgRed, color.Bold)
-var m = color.New(color.FgMagenta, color.Bold)
-var b = color.New(color.FgBlue, color.Bold)
-var c = color.New(color.FgCyan, color.Bold)
+var black = color.New(color.FgBlack, color.Bold, color.BgWhite) //status arrow
+var r = color.New(color.FgRed, color.Bold)                      //error
+var g = color.New(color.FgGreen, color.Bold)                    //2xx *
+var y = color.New(color.FgYellow, color.Bold)                   //3xx *
+var b = color.New(color.FgBlue, color.Bold)                     //5xx *
+var m = color.New(color.FgMagenta, color.Bold)                  //xxx *
+var c = color.New(color.FgCyan, color.Bold)                     //4xx *
+var w = color.New(color.FgWhite, color.Bold)                    //info *
 
 type OutLine struct {
 	Content string
