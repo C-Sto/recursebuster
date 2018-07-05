@@ -20,7 +20,7 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-const version = "1.0.4"
+const version = "1.0.5"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
