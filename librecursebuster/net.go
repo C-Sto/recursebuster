@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 )
 
@@ -13,6 +14,18 @@ func HttpReq(method, path string, client *http.Client, cfg Config) (*http.Respon
 	if cfg.Cookies != "" {
 		req.Header.Set("Cookie", cfg.Cookies)
 	}
+
+	if cfg.Auth != "" {
+		req.Header.Set("Authorization", "Basic "+cfg.Auth)
+	}
+
+	if len(cfg.Headers) > 0 {
+		for _, x := range cfg.Headers {
+			spl := strings.Split(x, ":")
+			req.Header.Set(spl[0], spl[1])
+		}
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, nil, err

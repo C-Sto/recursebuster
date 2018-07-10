@@ -1,6 +1,7 @@
 package librecursebuster
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -132,6 +133,23 @@ type Config struct {
 	HTTPS             bool
 	VerboseLevel      int
 	NoStatus          bool
+	Headers           ArrayStringFlag
+	Auth              string
+}
+
+type ArrayStringFlag []string
+
+func (i *ArrayStringFlag) String() string {
+	return fmt.Sprintf("%v", *i)
+}
+
+func (i *ArrayStringFlag) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
+func (i *ArrayStringFlag) Get() []string {
+	return *i
 }
 
 type SpiderPage struct {

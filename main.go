@@ -20,7 +20,7 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-const version = "1.0.5"
+const version = "1.0.6"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -71,6 +71,8 @@ func main() {
 	flag.IntVar(&cfg.VerboseLevel, "v", 0, "Verbosity level for output messages.")
 	flag.BoolVar(&showVersion, "version", false, "Show version number and exit")
 	flag.BoolVar(&cfg.NoStatus, "nostatus", false, "Don't print status info (for if it messes with the terminal)")
+	flag.Var(&cfg.Headers, "headers", "Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'")
+	flag.StringVar(&cfg.Auth, "auth", "", "Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.")
 
 	flag.Parse()
 
