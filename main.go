@@ -47,7 +47,7 @@ func main() {
 	flag.StringVar(&cfg.URL, "u", "", "Url to spider")
 	flag.StringVar(&cfg.Localpath, "o", "."+string(os.PathSeparator)+"busted.txt", "Local file to dump into")
 	flag.BoolVar(&cfg.SSLIgnore, "k", false, "Ignore SSL check")
-	flag.StringVar(&cfg.ProxyAddr, "p", "", "Proxy configuration options in the form ip:port eg: 127.0.0.1:9050")
+	flag.StringVar(&cfg.ProxyAddr, "p", "", "Proxy configuration options in the form ip:port eg: 127.0.0.1:9050. Note! If you want this to work with burp/use it with a HTTP proxy, specify as http://ip:port")
 	flag.StringVar(&cfg.Wordlist, "w", "", "Wordlist to use for bruteforce. Blank for spider only")
 	flag.StringVar(&cfg.Canary, "canary", "", "Custom value to use to check for wildcards")
 	flag.StringVar(&cfg.Agent, "ua", "RecurseBuster/"+version, "User agent to use when sending requests.")

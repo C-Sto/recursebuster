@@ -40,6 +40,10 @@ Since we are getting the page content anyway, why not use it to our advantage? S
 
 Gobuster is pretty fast when you smash -t 200, but who would do that? One of my goals for this was to keep performance on-par with gobuster where possible. On most webservers, recursebuster seems to be faster, even though it sends both a HEAD and a GET request. This means you will hit WAF limits really quickly, and is why by default it's -t 1.
 
+### Proxy options
+
+The ability to use a proxy is fairly useful in several situations. Not having to drop tools on a host in order to scan through it is always useful - recursebuster also works through burp if you specify it as a http proxy. It will fill up your http history fairly quickly though.
+
 ## Usage args
 
 Idk why you might want these, just run it with -h. Here they are anyway:
