@@ -185,12 +185,14 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 		}
 	}
 
+	maxDirs <- struct{}{}
+
 	//load in the wordlist to a channel (can probs be async)
 	wordsChan := make(chan string, 300) //don't expect we will need it much bigger than this
 
 	go LoadWords(cfg.Wordlist, wordsChan, printChan) //wordlist management doesn't need waitgroups, because of the following range statement
 
-	maxDirs <- struct{}{}
+	
 	PrintOutput(
 		fmt.Sprintf("Dirbusting %s", page.Url),
 		Info, 0, wg, printChan,
