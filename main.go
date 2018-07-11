@@ -20,7 +20,7 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-const version = "1.0.7"
+const version = "1.0.8"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -142,15 +142,28 @@ func main() {
 	wg := &sync.WaitGroup{}
 
 	state.Client = client
-	//user a proxy if requested to
+
+	//use a proxy if requested to
 	if cfg.ProxyAddr != "" {
+
+		if strings.HasPrefix(cfg.ProxyAddr, "http") {
+			proxyUrl, err := url.Parse("http://127.0.0.1:8080")
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println(proxyUrl)
+			httpTransport.Proxy = http.ProxyURL(proxyUrl)
+
+		} else {
+
+			dialer, err := proxy.SOCKS5("tcp", cfg.ProxyAddr, nil, proxy.Direct)
+			if err != nil {
+				os.Exit(1)
+			}
+			httpTransport.Dial = dialer.Dial
+		}
 		librecursebuster.PrintOutput(fmt.Sprintf("Proxy set to: %s", cfg.ProxyAddr), librecursebuster.Info, 0, wg, printChan)
 
-		dialer, err := proxy.SOCKS5("tcp", cfg.ProxyAddr, nil, proxy.Direct)
-		if err != nil {
-			os.Exit(1)
-		}
-		httpTransport.Dial = dialer.Dial
 	}
 
 	if cfg.BlacklistLocation != "" {
