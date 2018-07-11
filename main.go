@@ -169,6 +169,14 @@ func main() {
 		}
 	}
 
+	if cfg.Wordlist != "" {
+		readerChan := make(chan string, 100)
+		go librecursebuster.LoadWords(cfg.Wordlist, readerChan, printChan)
+		for _ = range readerChan {
+			state.WordlistLen++
+		}
+	}
+
 	canary := librecursebuster.RandString(printChan)
 
 	if cfg.Canary != "" {

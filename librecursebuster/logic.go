@@ -197,7 +197,9 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 	)
 	for word := range wordsChan { //will receive from the channel until it's closed
 		//read words off the channel, and test it
-
+		if cfg.MaxDirs == 1 {
+			state.DirbProgress++
+		}
 		//test with as many spare threads as we can
 		workers <- struct{}{}
 		wg.Add(1)
