@@ -145,13 +145,11 @@ func main() {
 
 	//use a proxy if requested to
 	if cfg.ProxyAddr != "" {
-
 		if strings.HasPrefix(cfg.ProxyAddr, "http") {
-			proxyUrl, err := url.Parse("http://127.0.0.1:8080")
+			proxyUrl, err := url.Parse(cfg.ProxyAddr)
 			if err != nil {
 				fmt.Println(err)
 			}
-			fmt.Println(proxyUrl)
 			httpTransport.Proxy = http.ProxyURL(proxyUrl)
 
 		} else {
@@ -163,7 +161,6 @@ func main() {
 			httpTransport.Dial = dialer.Dial
 		}
 		librecursebuster.PrintOutput(fmt.Sprintf("Proxy set to: %s", cfg.ProxyAddr), librecursebuster.Info, 0, wg, printChan)
-
 	}
 
 	if cfg.BlacklistLocation != "" {
