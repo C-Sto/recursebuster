@@ -20,7 +20,7 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-const version = "1.0.10"
+const version = "1.0.11"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -181,10 +181,16 @@ func main() {
 	}
 
 	if cfg.Wordlist != "" {
+
+		zerod := uint32(0)
+		state.DirbProgress = &zerod
+
+		zero := uint32(0)
+		state.WordlistLen = &zero
 		readerChan := make(chan string, 100)
 		go librecursebuster.LoadWords(cfg.Wordlist, readerChan, printChan)
 		for _ = range readerChan {
-			state.WordlistLen++
+			*state.WordlistLen++
 		}
 	}
 

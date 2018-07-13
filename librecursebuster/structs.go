@@ -101,8 +101,8 @@ type State struct {
 	Whitelist    map[string]bool
 	BadResponses map[int]bool
 	Extensions   []string
-	WordlistLen  uint
-	DirbProgress uint
+	WordlistLen  *uint32
+	DirbProgress *uint32
 }
 
 //Things that will be global, regardless of what URL is being queried

@@ -196,12 +196,12 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 		fmt.Sprintf("Dirbusting %s", page.Url),
 		Info, 0, wg, printChan,
 	)
+	if cfg.MaxDirs == 1 {
+		atomic.StoreUint32(state.DirbProgress, 0)
+	}
+	fmt.Println("Set to 0", atomic.LoadUint32(state.DirbProgress))
 	for word := range wordsChan { //will receive from the channel until it's closed
 		//read words off the channel, and test it
-		if cfg.MaxDirs == 1 {
-			state.DirbProgress++
-		}
-		//test with as many spare threads as we can
 
 		if len(state.Extensions) > 0 && state.Extensions[0] != "" {
 			for _, ext := range state.Extensions {
@@ -219,6 +219,9 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 		wg.Add(1)
 		go testURL(cfg, state, wg, page.Url+word, state.Client, newPages, workers, confirmed, printChan, testChan)
 
+		if cfg.MaxDirs == 1 {
+			atomic.AddUint32(state.DirbProgress, 1)
+		}
 	}
 	<-maxDirs
 

@@ -130,7 +130,13 @@ func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan O
 
 		if !cfg.NoStatus {
 			//assemble the status string
-			sprint := fmt.Sprintf("%s"+black.Sprintf(">")+"%s", status, testedURL)
+			sprint := fmt.Sprintf("%s"+black.Sprintf(">"), status)
+			if cfg.MaxDirs == 1 {
+				//this is the grossest format string I ever did see
+				sprint += fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(state.DirbProgress))/float64(atomic.LoadUint32(state.WordlistLen)), testedURL)
+			} else {
+				sprint += fmt.Sprintf("%s", testedURL)
+			}
 
 			//flush the line
 			fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
