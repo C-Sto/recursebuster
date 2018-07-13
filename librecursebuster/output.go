@@ -104,48 +104,40 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sy
 func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
 	tick := time.NewTicker(time.Second * 2)
 	status := getStatus(state)
-	maxLen := 0
+	spacesToClear := 0
 	testedURL := ""
 	for {
-		spaces := ""
 		select {
 		case o := <-printChan:
-			if o.Type != Status {
-				spaceCount := maxLen - len(o.Content)
+			//shoudln't need to check for status here..
 
-				if spaceCount > 0 {
-					if !cfg.NoStatus {
-						spaces = strings.Repeat(" ", spaceCount)
-					}
-				}
-				if o.Type == Debug {
-					if cfg.VerboseLevel >= o.Level {
-						o.Type.Println(o.Content + spaces)
-					}
-				} else {
-					o.Type.Println(o.Content + spaces)
-				}
+			//clear the line before printing anything
+			fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
 
+			if cfg.VerboseLevel >= o.Level {
+				o.Type.Println(o.Content)
+				//don't need to remember spaces to clear this line - this is newline suffixed
 			}
 			wg.Done()
-		case <-tick.C:
+
+		case <-tick.C: //time has elapsed the amount of time - it's been 2 seconds
 			status = getStatus(state)
-		case t := <-testChan:
+
+		case t := <-testChan: //a URL has been assessed
 			status = getStatus(state)
 			testedURL = t
-
 		}
 
-		sprint := fmt.Sprintf("%s"+black.Sprintf(">")+"%s", status, testedURL)
-		if maxLen < len(sprint) {
-			maxLen = len(sprint)
-		}
-		spaceCount := maxLen - len(sprint)
-		if spaceCount > 0 {
-			spaces = strings.Repeat(" ", spaceCount)
-		}
 		if !cfg.NoStatus {
-			Status.Printf(sprint + spaces + "\r")
+			//assemble the status string
+			sprint := fmt.Sprintf("%s"+black.Sprintf(">")+"%s", status, testedURL)
+
+			//flush the line
+			fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
+
+			Status.Printf(sprint + "\r")
+			//remember how many spaces we need to use to clear the line (21 for the date and time prefix)
+			spacesToClear = len(sprint) + 21
 		}
 
 	}
