@@ -138,6 +138,7 @@ type Config struct {
 	Headers           ArrayStringFlag
 	Auth              string
 	AppendDir         bool
+	NoRecursion       bool
 }
 
 type ArrayStringFlag []string

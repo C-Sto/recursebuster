@@ -20,7 +20,7 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-const version = "1.0.11"
+const version = "1.0.12"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -73,7 +73,8 @@ func main() {
 	flag.BoolVar(&cfg.NoStatus, "nostatus", false, "Don't print status info (for if it messes with the terminal)")
 	flag.Var(&cfg.Headers, "headers", "Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'")
 	flag.StringVar(&cfg.Auth, "auth", "", "Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.")
-	flag.BoolVar(&cfg.AppendDir, "appendSlash", false, "Append a / to all directory bruteforce requests (like extension, but slash instead of .yourthing)")
+	flag.BoolVar(&cfg.AppendDir, "appendslash", false, "Append a / to all directory bruteforce requests (like extension, but slash instead of .yourthing)")
+	flag.BoolVar(&cfg.NoRecursion, "norecursion", false, "Disable recursion, just work on the specified directory. Also disables spider function.")
 
 	flag.Parse()
 
@@ -229,6 +230,12 @@ func main() {
 	firstPage := librecursebuster.SpiderPage{}
 	firstPage.Url = h.String()
 	seedPages = append(seedPages, firstPage)
+
+	if !strings.HasSuffix(h.String(), "/") {
+		seedPages = append(seedPages, librecursebuster.SpiderPage{
+			Url: h.String() + "/",
+		})
+	}
 
 	librecursebuster.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0, wg, printChan)
 

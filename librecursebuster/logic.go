@@ -86,7 +86,8 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 		}
 
 		if _, ok := checked[actualUrl]; !ok && //must have not checked it before
-			(u.Host == state.ParsedURL.Host || state.Whitelist[u.Host]) { // && //must be within same domain, or be in whitelist
+			(u.Host == state.ParsedURL.Host || state.Whitelist[u.Host]) &&
+			!cfg.NoRecursion { // && //must be within same domain, or be in whitelist
 
 			checked[actualUrl] = true
 
@@ -146,7 +147,7 @@ func testURL(cfg Config, state State, wg *sync.WaitGroup, urlString string, clie
 	wg.Add(1)
 	confirmedGood <- SpiderPage{Url: urlString, Result: headResp}
 
-	if !cfg.NoSpider && good {
+	if !cfg.NoSpider && good && !cfg.NoRecursion {
 		urls, err := getUrls(content, printChan)
 		if err != nil {
 			PrintOutput(err.Error(), Error, 0, wg, printChan)
