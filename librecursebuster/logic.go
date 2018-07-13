@@ -200,7 +200,6 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 	if cfg.MaxDirs == 1 {
 		atomic.StoreUint32(state.DirbProgress, 0)
 	}
-	fmt.Println("Set to 0", atomic.LoadUint32(state.DirbProgress))
 	for word := range wordsChan { //will receive from the channel until it's closed
 		//read words off the channel, and test it
 
