@@ -192,7 +192,6 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 
 	go LoadWords(cfg.Wordlist, wordsChan, printChan) //wordlist management doesn't need waitgroups, because of the following range statement
 
-	
 	PrintOutput(
 		fmt.Sprintf("Dirbusting %s", page.Url),
 		Info, 0, wg, printChan,
@@ -203,15 +202,23 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 			state.DirbProgress++
 		}
 		//test with as many spare threads as we can
-		workers <- struct{}{}
-		wg.Add(1)
+
 		if len(state.Extensions) > 0 && state.Extensions[0] != "" {
 			for _, ext := range state.Extensions {
+				workers <- struct{}{}
+				wg.Add(1)
 				go testURL(cfg, state, wg, page.Url+word+"."+ext, state.Client, newPages, workers, confirmed, printChan, testChan)
 			}
-		} else {
-			go testURL(cfg, state, wg, page.Url+word, state.Client, newPages, workers, confirmed, printChan, testChan)
 		}
+		if cfg.AppendDir {
+			workers <- struct{}{}
+			wg.Add(1)
+			go testURL(cfg, state, wg, page.Url+word+"/", state.Client, newPages, workers, confirmed, printChan, testChan)
+		}
+		workers <- struct{}{}
+		wg.Add(1)
+		go testURL(cfg, state, wg, page.Url+word, state.Client, newPages, workers, confirmed, printChan, testChan)
+
 	}
 	<-maxDirs
 

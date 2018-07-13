@@ -73,6 +73,7 @@ func main() {
 	flag.BoolVar(&cfg.NoStatus, "nostatus", false, "Don't print status info (for if it messes with the terminal)")
 	flag.Var(&cfg.Headers, "headers", "Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'")
 	flag.StringVar(&cfg.Auth, "auth", "", "Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.")
+	flag.BoolVar(&cfg.AppendDir, "appendSlash", false, "Append a / to all directory bruteforce requests (like extension, but slash instead of .yourthing)")
 
 	flag.Parse()
 

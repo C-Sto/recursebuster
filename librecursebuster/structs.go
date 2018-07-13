@@ -137,6 +137,7 @@ type Config struct {
 	NoStatus          bool
 	Headers           ArrayStringFlag
 	Auth              string
+	AppendDir         bool
 }
 
 type ArrayStringFlag []string
