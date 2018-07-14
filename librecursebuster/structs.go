@@ -139,6 +139,7 @@ type Config struct {
 	Auth              string
 	AppendDir         bool
 	NoRecursion       bool
+	BurpMode          bool
 }
 
 type ArrayStringFlag []string

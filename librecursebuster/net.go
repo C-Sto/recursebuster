@@ -2,11 +2,56 @@ package librecursebuster
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"sync"
+	"time"
+
+	"golang.org/x/net/proxy"
 )
+
+func ConfigureHTTPClient(cfg Config, wg *sync.WaitGroup, printChan chan OutLine, sendToBurpOnly bool) *http.Client {
+
+	httpTransport := &http.Transport{MaxIdleConns: 100}
+	client := &http.Client{Transport: httpTransport, Timeout: time.Duration(cfg.Timeout) * time.Second}
+
+	//skip ssl errors
+	httpTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.SSLIgnore}
+
+	if !cfg.FollowRedirects {
+		client.CheckRedirect = RedirectHandler
+	}
+
+	//use a proxy if requested to
+	if (cfg.ProxyAddr != "" && !cfg.BurpMode) || //proxy is configured, and burpmode is disabled
+		(cfg.ProxyAddr != "" && cfg.BurpMode && sendToBurpOnly) { // proxy configured, in burpmode, and at the stage where we want to actually send it to burp
+		if strings.HasPrefix(cfg.ProxyAddr, "http") {
+			proxyUrl, err := url.Parse(cfg.ProxyAddr)
+			if err != nil {
+				fmt.Println(err)
+			}
+			httpTransport.Proxy = http.ProxyURL(proxyUrl)
+
+		} else {
+
+			dialer, err := proxy.SOCKS5("tcp", cfg.ProxyAddr, nil, proxy.Direct)
+			if err != nil {
+				os.Exit(1)
+			}
+			httpTransport.Dial = dialer.Dial
+		}
+		if !sendToBurpOnly {
+			//send the set proxy status (don't need this for burp requests)
+			PrintOutput(fmt.Sprintf("Proxy set to: %s", cfg.ProxyAddr), Info, 0, wg, printChan)
+		}
+	}
+
+	return client
+}
 
 func HttpReq(method, path string, client *http.Client, cfg Config) (*http.Response, []byte, error) {
 	req, err := http.NewRequest(method, path, nil)
@@ -58,11 +103,19 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, urlString string, 
 
 	//this is all we have to do if we aren't doing GET's
 	if cfg.NoGet {
+		if cfg.BurpMode { //send successful request again... twice as many requests, but less burp spam
+
+			client = ConfigureHTTPClient(cfg, wg, printChan, true)
+			HttpReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
+		}
 		<-workers
 		return
 	}
 
 	//get content from validated path/file thing
+	if cfg.BurpMode {
+		client = ConfigureHTTPClient(cfg, wg, printChan, true)
+	}
 	headResp, content, err = HttpReq("GET", urlString, client, cfg)
 	<-workers //done with the net thread
 	if err != nil {

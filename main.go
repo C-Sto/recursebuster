@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"net/http"
@@ -17,10 +16,9 @@ import (
 
 	"github.com/c-sto/recursebuster/librecursebuster"
 	"github.com/fatih/color"
-	"golang.org/x/net/proxy"
 )
 
-const version = "1.0.12"
+const version = "1.0.13"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -29,6 +27,7 @@ func main() {
 	} else {
 		librecursebuster.InitLogger(os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stderr)
 	}
+	wg := &sync.WaitGroup{}
 	cfg := librecursebuster.Config{}
 	seedPages := []librecursebuster.SpiderPage{}
 	//the state should probably change per different host.. eventually
@@ -75,6 +74,7 @@ func main() {
 	flag.StringVar(&cfg.Auth, "auth", "", "Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.")
 	flag.BoolVar(&cfg.AppendDir, "appendslash", false, "Append a / to all directory bruteforce requests (like extension, but slash instead of .yourthing)")
 	flag.BoolVar(&cfg.NoRecursion, "norecursion", false, "Disable recursion, just work on the specified directory. Also disables spider function.")
+	flag.BoolVar(&cfg.BurpMode, "sitemap", false, "Send 'good' requests to the configured proxy. Requires the proxy flag to be set. ***NOTE: with this option, the proxy is ONLY used for good requests - all other requests go out as normal!***")
 
 	flag.Parse()
 
@@ -125,14 +125,7 @@ func main() {
 	}
 
 	state.ParsedURL = h
-	httpTransport := &http.Transport{MaxIdleConns: 100}
-	client := &http.Client{Transport: httpTransport, Timeout: time.Duration(cfg.Timeout) * time.Second}
-
-	if !cfg.FollowRedirects {
-		client.CheckRedirect = librecursebuster.RedirectHandler
-	}
-	//skip ssl errors if requested to
-	httpTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.SSLIgnore}
+	client := librecursebuster.ConfigureHTTPClient(cfg, wg, printChan, false)
 
 	//setup channels
 	pages := make(chan librecursebuster.SpiderPage, 1000)
@@ -141,29 +134,8 @@ func main() {
 	workers := make(chan struct{}, cfg.Threads)
 	maxDirs := make(chan struct{}, cfg.MaxDirs)
 	testChan := make(chan string, 100)
-	wg := &sync.WaitGroup{}
 
 	state.Client = client
-
-	//use a proxy if requested to
-	if cfg.ProxyAddr != "" {
-		if strings.HasPrefix(cfg.ProxyAddr, "http") {
-			proxyUrl, err := url.Parse(cfg.ProxyAddr)
-			if err != nil {
-				fmt.Println(err)
-			}
-			httpTransport.Proxy = http.ProxyURL(proxyUrl)
-
-		} else {
-
-			dialer, err := proxy.SOCKS5("tcp", cfg.ProxyAddr, nil, proxy.Direct)
-			if err != nil {
-				os.Exit(1)
-			}
-			httpTransport.Dial = dialer.Dial
-		}
-		librecursebuster.PrintOutput(fmt.Sprintf("Proxy set to: %s", cfg.ProxyAddr), librecursebuster.Info, 0, wg, printChan)
-	}
 
 	if cfg.BlacklistLocation != "" {
 		readerChan := make(chan string, 100)
