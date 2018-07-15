@@ -75,6 +75,8 @@ Idk why you might want these, just run it with `-h` and grep for the keyword. He
         Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'
   -https
         Use HTTPS instead of HTTP.
+  -iL string
+        File to use as an input list of URL's to start from
   -k    Ignore SSL check
   -len
         Show, and write the length of the response
@@ -88,7 +90,7 @@ Idk why you might want these, just run it with `-h` and grep for the keyword. He
         Don't print status info (for if it messes with the terminal)
   -o string
         Local file to dump into (default ".\\busted.txt")
-  -p string
+  -proxy string
         Proxy configuration options in the form ip:port eg: 127.0.0.1:9050. Note! If you want this to work with burp/use it with a HTTP proxy, specify as http://ip:port
   -ratio float
         Similarity ratio to the 404 canary page. (default 0.95)
@@ -104,7 +106,7 @@ go out as normal!***
   -u string
         Url to spider
   -ua string
-        User agent to use when sending requests. (default "RecurseBuster/1.0.13")
+        User agent to use when sending requests. (default "RecurseBuster/1.1.0")
   -v int
         Verbosity level for output messages.
   -version
