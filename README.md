@@ -26,31 +26,35 @@ This will run a recursive-HEAD-spider-assisted search with a single thread on go
 
 ### HEAD Based Checks
 
-For servers the support it, HEAD based checks speed up content discovery considerably, since no body is required to be transferred. The default logic is to use a HEAD request to determine if something exists. If it seems to exist, a GET is sent to retrieve and verify.
+For servers the support it, HEAD based checks speed up content discovery considerably, since no body is required to be transferred. The default logic is to use a HEAD request to determine if something exists. If it seems to exist, a GET is sent to retrieve and verify. If there are sensitive pages that perform actions (AKA, ones that don't really follow the HTTP Verb Spec), a file containing a list of *exact* URLS that should not requested can be blacklisted with the `-blacklist` flag.
 
 ### Recursion
 
-When a directory is identified, it gets added to the queue to be brute-forced. By default, one directory is brute-forced at a time, mostly for sanity checks, but this can be increased to as many as you like.
+When a directory is identified, it gets added to the queue to be brute-forced. By default, one directory is brute-forced at a time, mostly for sanity checks, but this can be increased to as many as you like using the `-dirs x` flag. This won't increase the speed, and will disable some of the status output features.
 
 ### Spider Assistance
 
-Since we are getting the page content anyway, why not use it to our advantage? Some basic checks are done to look for links on the page, these links are added, and any directories identified added too.
+Since we are getting the page content anyway, why not use it to our advantage? Some basic checks are done to look for links within the HTML response. The links are added, and any directories identified added too. By default, only the supplied host is whitelisted, so any links that go off-site (rather, to a different domain) are ignored. You can specify a file that contains a list of whitelisted domains that you are OK with including into the spider with the `-whitelist` flag.
 
 ### Speed
 
-Gobuster is pretty fast when you smash -t 200, but who would do that? One of my goals for this was to keep performance on-par with gobuster where possible. On most webservers, recursebuster seems to be faster, even though it sends both a HEAD and a GET request. This means you will hit WAF limits really quickly, and is why by default it's -t 1.
+Gobuster is pretty fast when you smash `-t 200`, but who would do that? One of my goals for this was to keep performance on-par with gobuster where possible. On most webservers, recursebuster seems to be faster, even though it sends both a HEAD and a GET request. This means you will hit WAF limits really quickly, and is why by default it's `-t 1`.
 
 ### Proxy options
 
-The ability to use a proxy is fairly useful in several situations. Not having to drop tools on a host in order to scan through it is always useful - recursebuster also works through burp if you specify it as a http proxy. It will fill up your http history fairly quickly though.
+The ability to use a proxy is fairly useful in several situations. Not having to drop tools on a host in order to scan through it is always useful - recursebuster also works through burp if you specify it as a http proxy. When using Recursebuster to supplement the burp sitemap - use the `-stitemap` option to send _only_ the 'found' or interesting responses to burp, this should help avoid filling up your HTTP History with 404's.
 
 ## Usage args
 
-Idk why you might want these, just run it with -h. Here they are anyway:
+Idk why you might want these, just run it with `-h` and grep for the keyword. Here they are anyway:
 
 ```
   -all
         Show, and write the result of all checks
+  -appendslash
+        Append a / to all directory bruteforce requests (like extension, but slash instead of .yourthing)
+  -auth string
+        Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.
   -bad string
         Responses to consider 'bad' or 'not found'. Comma-separated This works the opposite way of gobuster! (default "404")
   -blacklist string
@@ -67,6 +71,8 @@ Idk why you might want these, just run it with -h. Here they are anyway:
         Maximum directories to perform busting on concurrently NOTE: directories will still be brute forced, this setting simply directs how many should be concurrently bruteforced (default 1)
   -ext string
         Extensions to append to checks. Multiple extensions can be specified, comma separate them.
+  -headers value
+        Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'
   -https
         Use HTTPS instead of HTTP.
   -k    Ignore SSL check
@@ -74,16 +80,23 @@ Idk why you might want these, just run it with -h. Here they are anyway:
         Show, and write the length of the response
   -noget
         Do not perform a GET request (only use HEAD request/response)
+  -norecursion
+        Disable recursion, just work on the specified directory. Also disables spider function.
+  -nospider
+        Don't search the page body for links, and directories to add to the spider queue.
+  -nostatus
+        Don't print status info (for if it messes with the terminal)
   -o string
-        Local file to dump into (default "./busted.txt")
+        Local file to dump into (default ".\\busted.txt")
   -p string
-        Proxy configuration options in the form ip:port eg: 127.0.0.1:9050
+        Proxy configuration options in the form ip:port eg: 127.0.0.1:9050. Note! If you want this to work with burp/use it with a HTTP proxy, specify as http://ip:port
   -ratio float
         Similarity ratio to the 404 canary page. (default 0.95)
   -redirect
         Follow redirects
-  -spider
-        Search the page body for links, and directories to add to the spider queue.
+  -sitemap
+        Send 'good' requests to the configured proxy. Requires the proxy flag to be set. ***NOTE: with this option, the proxy is ONLY used for good requests - all other requests
+go out as normal!***
   -t int
         Number of concurrent threads (default 1)
   -timeout int
@@ -91,7 +104,11 @@ Idk why you might want these, just run it with -h. Here they are anyway:
   -u string
         Url to spider
   -ua string
-        User agent to use when sending requests. (default "RecurseBuster/1.0.1")
+        User agent to use when sending requests. (default "RecurseBuster/1.0.13")
+  -v int
+        Verbosity level for output messages.
+  -version
+        Show version number and exit
   -w string
         Wordlist to use for bruteforce. Blank for spider only
   -whitelist string

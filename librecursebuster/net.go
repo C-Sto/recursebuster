@@ -55,6 +55,11 @@ func ConfigureHTTPClient(cfg Config, wg *sync.WaitGroup, printChan chan OutLine,
 
 func HttpReq(method, path string, client *http.Client, cfg Config) (*http.Response, []byte, error) {
 	req, err := http.NewRequest(method, path, nil)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
 	req.Header.Set("User-Agent", cfg.Agent)
 	if cfg.Cookies != "" {
 		req.Header.Set("Cookie", cfg.Cookies)
@@ -128,11 +133,11 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, urlString string, 
 	//check we care about it (body only) section
 	//double check that it's not 404/error using smart blockchain AI tech
 	PrintOutput(
-		fmt.Sprintf("%v, %v, %v",
-			content, state.Soft404ResponseBody,
-			detectSoft404(content, state.Soft404ResponseBody, cfg.Ratio404)),
+		fmt.Sprintf("Checking body for 404:\nContent: %v,\nSoft404:%v,\nResponse:%v",
+			string(content), string(state.Hosts.Get404Body(headResp.Request.Host)),
+			detectSoft404(content, state.Hosts.Get404Body(headResp.Request.Host), cfg.Ratio404)),
 		Debug, 4, wg, printChan)
-	if detectSoft404(content, state.Soft404ResponseBody, cfg.Ratio404) {
+	if detectSoft404(content, state.Hosts.Get404Body(headResp.Request.Host), cfg.Ratio404) {
 		success = false
 		//seems to be a soft 404 lol
 		return

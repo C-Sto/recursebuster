@@ -14,17 +14,17 @@ func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages
 	//manages net request workers
 	for {
 		page := <-pages
-		if state.Blacklist[page.Url] {
+		if state.Blacklist[page.URL] {
 			wg.Done()
-			PrintOutput(fmt.Sprintf("Not testing blacklisted URL: %s", page.Url), Info, 0, wg, printChan)
+			PrintOutput(fmt.Sprintf("Not testing blacklisted URL: %s", page.URL), Info, 0, wg, printChan)
 			continue
 		}
 
 		workers <- struct{}{}
 		wg.Add(1)
-		go testURL(cfg, state, wg, page.Url, state.Client, newPages, workers, confirmed, printChan, testChan)
+		go testURL(cfg, state, wg, page.URL, state.Client, newPages, workers, confirmed, printChan, testChan)
 
-		if cfg.Wordlist != "" && string(page.Url[len(page.Url)-1]) == "/" { //if we are testing a directory
+		if cfg.Wordlist != "" && string(page.URL[len(page.URL)-1]) == "/" { //if we are testing a directory
 
 			//check for wildcard response
 
@@ -43,13 +43,14 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 		candidate := <-newpages
 
 		//shortcut (will make checked much bigger than it should be, but will save cycles)
-		if _, ok := preCheck[candidate.Url]; ok {
+		if _, ok := preCheck[candidate.URL]; ok {
 			wg.Done()
 			continue
 		}
-		preCheck[candidate.Url] = true
+		preCheck[candidate.URL] = true
 
-		u, err := url.Parse(strings.TrimSpace(candidate.Url))
+		//check the candidate is an actual URL
+		u, err := url.Parse(strings.TrimSpace(candidate.URL))
 
 		if err != nil {
 			wg.Done()
@@ -57,10 +58,14 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 			continue //probably a better way of doing this
 		}
 
+		//links of the form <a href="/thing" ></a> don't have a host portion to the URL
 		if len(u.Host) == 0 {
-			u.Host = state.ParsedURL.Host
+			u.Host = candidate.Reference.Host
+			//u.Host = state.ParsedURL.Host
 		}
-		actualUrl := state.ParsedURL.Scheme + "://" + u.Host
+
+		//actualUrl := state.ParsedURL.Scheme + "://" + u.Host
+		actualURL := (*candidate.Reference).Scheme + "://" + u.Host
 
 		//path.Clean removes trailing /, so we need to add it in again after cleaning (removing dots etc) :rolling eyes emoji:
 		var didHaveSlash bool
@@ -78,27 +83,27 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 			cleaned = "/" + cleaned
 		}
 		if cleaned != "." {
-			actualUrl += cleaned
+			actualURL += cleaned
 
 		}
 		if didHaveSlash && cleaned != "/" {
-			actualUrl += "/"
+			actualURL += "/"
 		}
 
-		if _, ok := checked[actualUrl]; !ok && //must have not checked it before
-			(u.Host == state.ParsedURL.Host || state.Whitelist[u.Host]) &&
-			!cfg.NoRecursion { // && //must be within same domain, or be in whitelist
+		if _, ok := checked[actualURL]; !ok && //must have not checked it before
+			(state.Hosts.HostExists(u.Host) || state.Whitelist[u.Host]) && //must be within whitelist, or be one of the starting urls
+			!cfg.NoRecursion { //no recursion means we don't care about adding extra paths or content
 
-			checked[actualUrl] = true
+			checked[actualURL] = true
 
 			wg.Add(1)
-			pages <- SpiderPage{Url: actualUrl}
+			pages <- SpiderPage{URL: actualURL, Reference: candidate.Reference}
 
 			//also add any directories in the supplied path to the 'to be hacked' queue
 			path := ""
 			dirs := strings.Split(u.Path, "/")
 			for i, y := range dirs {
-				//newPage := librecursebuster.SpiderPage{}
+
 				path = path + y
 				if len(path) > 0 && string(path[len(path)-1]) != "/" && i != len(dirs)-1 {
 					path = path + "/" //don't add double /'s, and don't add on the last value
@@ -107,9 +112,11 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 				if len(path) > 0 && string(path[0]) != "/" {
 					path = "/" + path
 				}
-				newDir := state.ParsedURL.Scheme + "://" + state.ParsedURL.Host + path
+
+				newDir := candidate.Reference.Scheme + "://" + candidate.Reference.Host + path
 				newPage := SpiderPage{}
-				newPage.Url = newDir
+				newPage.URL = newDir
+				newPage.Reference = candidate.Reference
 				wg.Add(1)
 				newpages <- newPage
 			}
@@ -141,11 +148,11 @@ func testURL(cfg Config, state State, wg *sync.WaitGroup, urlString string, clie
 	//inception (but also check if the directory version is good, and add that to the queue too)
 	if string(urlString[len(urlString)-1]) != "/" && good {
 		wg.Add(1)
-		newPages <- SpiderPage{Url: urlString + "/"}
+		newPages <- SpiderPage{URL: urlString + "/", Reference: headResp.Request.URL}
 	}
 
 	wg.Add(1)
-	confirmedGood <- SpiderPage{Url: urlString, Result: headResp}
+	confirmedGood <- SpiderPage{URL: urlString, Result: headResp, Reference: headResp.Request.URL}
 
 	if !cfg.NoSpider && good && !cfg.NoRecursion {
 		urls, err := getUrls(content, printChan)
@@ -155,7 +162,8 @@ func testURL(cfg Config, state State, wg *sync.WaitGroup, urlString string, clie
 		for _, x := range urls { //add any found pages into the pool
 			//add all the directories
 			newPage := SpiderPage{}
-			newPage.Url = x
+			newPage.URL = x
+			newPage.Reference = headResp.Request.URL
 
 			PrintOutput(
 				fmt.Sprintf("Found URL on page: %s", x),
@@ -171,16 +179,22 @@ func testURL(cfg Config, state State, wg *sync.WaitGroup, urlString string, clie
 func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, workers chan struct{}, pages, newPages, confirmed chan SpiderPage, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
 	defer wg.Done()
 
+	//ugh
+	u, err := url.Parse(page.URL)
+	if err != nil {
+		PrintOutput("This should never occur, url parse error on parsed url?"+err.Error(), Error, 0, wg, printChan)
+		return
+	}
 	//check to make sure we aren't dirbusting a wildcardyboi
 	workers <- struct{}{}
-	_, x, res := evaluateURL(wg, cfg, state, page.Url+RandString(printChan), state.Client, workers, printChan)
+	_, x, res := evaluateURL(wg, cfg, state, page.URL+RandString(printChan), state.Client, workers, printChan)
 
 	if res { //true response indicates a good response for a guid path, unlikely good
-		if detectSoft404(x, state.Soft404ResponseBody, cfg.Ratio404) {
+		if detectSoft404(x, state.Hosts.Get404Body(u.Host), cfg.Ratio404) {
 			//it's a soft404 probably, guess we can continue
 		} else {
 			PrintOutput(
-				fmt.Sprintf("Wildcard repsonse detected, skipping dirbusting of %s", page.Url),
+				fmt.Sprintf("Wildcard repsonse detected, skipping dirbusting of %s", page.URL),
 				Info, 0, wg, printChan)
 			return
 		}
@@ -194,7 +208,7 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 	go LoadWords(cfg.Wordlist, wordsChan, printChan) //wordlist management doesn't need waitgroups, because of the following range statement
 
 	PrintOutput(
-		fmt.Sprintf("Dirbusting %s", page.Url),
+		fmt.Sprintf("Dirbusting %s", page.URL),
 		Info, 0, wg, printChan,
 	)
 	if cfg.MaxDirs == 1 {
@@ -207,17 +221,17 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 			for _, ext := range state.Extensions {
 				workers <- struct{}{}
 				wg.Add(1)
-				go testURL(cfg, state, wg, page.Url+word+"."+ext, state.Client, newPages, workers, confirmed, printChan, testChan)
+				go testURL(cfg, state, wg, page.URL+word+"."+ext, state.Client, newPages, workers, confirmed, printChan, testChan)
 			}
 		}
 		if cfg.AppendDir {
 			workers <- struct{}{}
 			wg.Add(1)
-			go testURL(cfg, state, wg, page.Url+word+"/", state.Client, newPages, workers, confirmed, printChan, testChan)
+			go testURL(cfg, state, wg, page.URL+word+"/", state.Client, newPages, workers, confirmed, printChan, testChan)
 		}
 		workers <- struct{}{}
 		wg.Add(1)
-		go testURL(cfg, state, wg, page.Url+word, state.Client, newPages, workers, confirmed, printChan, testChan)
+		go testURL(cfg, state, wg, page.URL+word, state.Client, newPages, workers, confirmed, printChan, testChan)
 
 		if cfg.MaxDirs == 1 {
 			atomic.AddUint32(state.DirbProgress, 1)
@@ -225,6 +239,6 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 	}
 	<-maxDirs
 
-	PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.Url), Info, 0, wg, printChan)
+	PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0, wg, printChan)
 
 }

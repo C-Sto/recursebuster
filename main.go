@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "net/http/pprof"
@@ -18,7 +19,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.0.13"
+const version = "1.1.0"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -27,96 +28,57 @@ func main() {
 	} else {
 		librecursebuster.InitLogger(os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stderr)
 	}
+
 	wg := &sync.WaitGroup{}
 	cfg := librecursebuster.Config{}
-	seedPages := []librecursebuster.SpiderPage{}
+
 	//the state should probably change per different host.. eventually
-	state := librecursebuster.State{
+	globalState := librecursebuster.State{
 		BadResponses: make(map[int]bool),
 		Whitelist:    make(map[string]bool),
 		Blacklist:    make(map[string]bool),
 	}
-	//states := []librecursebuster.State{state}
+	globalState.Hosts.Init()
 
 	cfg.Version = version
 	totesTested := uint64(0)
-	state.TotalTested = &totesTested
+	globalState.TotalTested = &totesTested
 	showVersion := true
-	flag.IntVar(&cfg.Threads, "t", 1, "Number of concurrent threads")
-	flag.StringVar(&cfg.URL, "u", "", "Url to spider")
-	flag.StringVar(&cfg.Localpath, "o", "."+string(os.PathSeparator)+"busted.txt", "Local file to dump into")
-	flag.BoolVar(&cfg.SSLIgnore, "k", false, "Ignore SSL check")
-	flag.StringVar(&cfg.ProxyAddr, "p", "", "Proxy configuration options in the form ip:port eg: 127.0.0.1:9050. Note! If you want this to work with burp/use it with a HTTP proxy, specify as http://ip:port")
-	flag.StringVar(&cfg.Wordlist, "w", "", "Wordlist to use for bruteforce. Blank for spider only")
-	flag.StringVar(&cfg.Canary, "canary", "", "Custom value to use to check for wildcards")
-	flag.StringVar(&cfg.Agent, "ua", "RecurseBuster/"+version, "User agent to use when sending requests.")
-	flag.Float64Var(&cfg.Ratio404, "ratio", 0.95, "Similarity ratio to the 404 canary page.")
-	flag.StringVar(&cfg.BlacklistLocation, "blacklist", "", "Blacklist of prefixes to not check. Will not check on exact matches.")
-	flag.BoolVar(&cfg.NoSpider, "nospider", false, "Don't search the page body for links, and directories to add to the spider queue.")
-	flag.IntVar(&cfg.Timeout, "timeout", 20, "Timeout (seconds) for HTTP/TCP connections")
-	flag.BoolVar(&cfg.Debug, "debug", false, "Enable debugging")
-	flag.BoolVar(&cfg.NoGet, "noget", false, "Do not perform a GET request (only use HEAD request/response)")
-	flag.IntVar(&cfg.MaxDirs, "dirs", 1, "Maximum directories to perform busting on concurrently NOTE: directories will still be brute forced, this setting simply directs how many should be concurrently bruteforced")
 	flag.BoolVar(&cfg.ShowAll, "all", false, "Show, and write the result of all checks")
-	flag.BoolVar(&cfg.ShowLen, "len", false, "Show, and write the length of the response")
-	flag.StringVar(&cfg.WhitelistLocation, "whitelist", "", "Whitelist of domains to include in brute-force")
-	flag.BoolVar(&cfg.FollowRedirects, "redirect", false, "Follow redirects")
+	flag.BoolVar(&cfg.AppendDir, "appendslash", false, "Append a / to all directory bruteforce requests (like extension, but slash instead of .yourthing)")
+	flag.StringVar(&cfg.Auth, "auth", "", "Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.")
 	flag.StringVar(&cfg.BadResponses, "bad", "404", "Responses to consider 'bad' or 'not found'. Comma-separated This works the opposite way of gobuster!")
+	flag.StringVar(&cfg.BlacklistLocation, "blacklist", "", "Blacklist of prefixes to not check. Will not check on exact matches.")
+	flag.StringVar(&cfg.Canary, "canary", "", "Custom value to use to check for wildcards")
 	flag.BoolVar(&cfg.CleanOutput, "clean", false, "Output clean URLs to the output file for easy loading into other tools and whatnot.")
 	flag.StringVar(&cfg.Cookies, "cookies", "", "Any cookies to include with requests. This is smashed into the cookies header, so copy straight from burp I guess.")
+	flag.BoolVar(&cfg.Debug, "debug", false, "Enable debugging")
+	flag.IntVar(&cfg.MaxDirs, "dirs", 1, "Maximum directories to perform busting on concurrently NOTE: directories will still be brute forced, this setting simply directs how many should be concurrently bruteforced")
 	flag.StringVar(&cfg.Extensions, "ext", "", "Extensions to append to checks. Multiple extensions can be specified, comma separate them.")
-	// soon.jpg	flag.StringVar(&cfg.InputList, "iL", "", "File to use as an input list of URL's to start from")
+	flag.Var(&cfg.Headers, "headers", "Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'")
 	flag.BoolVar(&cfg.HTTPS, "https", false, "Use HTTPS instead of HTTP.")
+	flag.StringVar(&cfg.InputList, "iL", "", "File to use as an input list of URL's to start from")
+	flag.BoolVar(&cfg.SSLIgnore, "k", false, "Ignore SSL check")
+	flag.BoolVar(&cfg.ShowLen, "len", false, "Show, and write the length of the response")
+	flag.BoolVar(&cfg.NoGet, "noget", false, "Do not perform a GET request (only use HEAD request/response)")
+	flag.BoolVar(&cfg.NoRecursion, "norecursion", false, "Disable recursion, just work on the specified directory. Also disables spider function.")
+	flag.BoolVar(&cfg.NoSpider, "nospider", false, "Don't search the page body for links, and directories to add to the spider queue.")
+	flag.BoolVar(&cfg.NoStatus, "nostatus", false, "Don't print status info (for if it messes with the terminal)")
+	flag.StringVar(&cfg.Localpath, "o", "."+string(os.PathSeparator)+"busted.txt", "Local file to dump into")
+	flag.StringVar(&cfg.ProxyAddr, "proxy", "", "Proxy configuration options in the form ip:port eg: 127.0.0.1:9050. Note! If you want this to work with burp/use it with a HTTP proxy, specify as http://ip:port")
+	flag.Float64Var(&cfg.Ratio404, "ratio", 0.95, "Similarity ratio to the 404 canary page.")
+	flag.BoolVar(&cfg.FollowRedirects, "redirect", false, "Follow redirects")
+	flag.BoolVar(&cfg.BurpMode, "sitemap", false, "Send 'good' requests to the configured proxy. Requires the proxy flag to be set. ***NOTE: with this option, the proxy is ONLY used for good requests - all other requests go out as normal!***")
+	flag.IntVar(&cfg.Threads, "t", 1, "Number of concurrent threads")
+	flag.IntVar(&cfg.Timeout, "timeout", 20, "Timeout (seconds) for HTTP/TCP connections")
+	flag.StringVar(&cfg.URL, "u", "", "Url to spider")
+	flag.StringVar(&cfg.Agent, "ua", "RecurseBuster/"+version, "User agent to use when sending requests.")
 	flag.IntVar(&cfg.VerboseLevel, "v", 0, "Verbosity level for output messages.")
 	flag.BoolVar(&showVersion, "version", false, "Show version number and exit")
-	flag.BoolVar(&cfg.NoStatus, "nostatus", false, "Don't print status info (for if it messes with the terminal)")
-	flag.Var(&cfg.Headers, "headers", "Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'")
-	flag.StringVar(&cfg.Auth, "auth", "", "Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.")
-	flag.BoolVar(&cfg.AppendDir, "appendslash", false, "Append a / to all directory bruteforce requests (like extension, but slash instead of .yourthing)")
-	flag.BoolVar(&cfg.NoRecursion, "norecursion", false, "Disable recursion, just work on the specified directory. Also disables spider function.")
-	flag.BoolVar(&cfg.BurpMode, "sitemap", false, "Send 'good' requests to the configured proxy. Requires the proxy flag to be set. ***NOTE: with this option, the proxy is ONLY used for good requests - all other requests go out as normal!***")
+	flag.StringVar(&cfg.Wordlist, "w", "", "Wordlist to use for bruteforce. Blank for spider only")
+	flag.StringVar(&cfg.WhitelistLocation, "whitelist", "", "Whitelist of domains to include in brute-force")
 
 	flag.Parse()
-
-	if showVersion {
-		librecursebuster.PrintBanner(cfg)
-		os.Exit(0)
-	}
-
-	printChan := make(chan librecursebuster.OutLine, 200)
-	if cfg.URL == "" && cfg.InputList == "" { //&& cfg.InputList == ""
-		flag.Usage()
-		os.Exit(1)
-	}
-	var h *url.URL
-	var err error
-	if cfg.URL != "" {
-		h, err = url.Parse(cfg.URL)
-		if err != nil {
-			panic("URL parse fail")
-		}
-
-		if h.Scheme == "" {
-			if cfg.HTTPS {
-				h, err = url.Parse("https://" + cfg.URL)
-			} else {
-				h, err = url.Parse("http://" + cfg.URL)
-			}
-		}
-
-	}
-
-	for _, x := range strings.Split(cfg.Extensions, ",") {
-		state.Extensions = append(state.Extensions, x)
-	}
-
-	for _, x := range strings.Split(cfg.BadResponses, ",") {
-		i, err := strconv.Atoi(x)
-		if err != nil {
-			panic(err)
-		}
-		state.BadResponses[i] = true
-	}
 
 	if cfg.Debug {
 		go func() {
@@ -124,7 +86,66 @@ func main() {
 		}()
 	}
 
-	state.ParsedURL = h
+	if showVersion {
+		librecursebuster.PrintBanner(cfg)
+		os.Exit(0)
+	}
+
+	printChan := make(chan librecursebuster.OutLine, 200)
+	if cfg.URL == "" && cfg.InputList == "" {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	var h *url.URL
+	var err error
+	URLSlice := []string{} //
+	if cfg.URL != "" {
+		URLSlice = append(URLSlice, cfg.URL)
+	}
+	if cfg.InputList != "" { //can have both -u flag and -iL flag
+		//must be using an input list
+		URLList := make(chan string, 10)
+		go librecursebuster.LoadWords(cfg.InputList, URLList, printChan)
+		for x := range URLList {
+			//ensure all urls will parse good
+			_, err = url.Parse(x)
+			if err != nil {
+				panic("URL parse fail: " + err.Error())
+			}
+			URLSlice = append(URLSlice, x)
+			//globalState.Whitelist[u.Host] = true
+		}
+	}
+
+	h, err = url.Parse(URLSlice[0])
+
+	if err != nil {
+		panic("URL parse fail")
+	}
+
+	if h.Scheme == "" {
+		if cfg.HTTPS {
+			h, err = url.Parse("https://" + URLSlice[0])
+		} else {
+			h, err = url.Parse("http://" + URLSlice[0])
+		}
+	}
+
+	for _, x := range strings.Split(cfg.Extensions, ",") {
+		globalState.Extensions = append(globalState.Extensions, x)
+	}
+
+	for _, x := range strings.Split(cfg.BadResponses, ",") {
+		i, err := strconv.Atoi(x)
+		if err != nil {
+			panic(err)
+		}
+		globalState.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
+	}
+
+	globalState.Hosts.AddHost(h)
+	//state.ParsedURL = h
 	client := librecursebuster.ConfigureHTTPClient(cfg, wg, printChan, false)
 
 	//setup channels
@@ -135,13 +156,13 @@ func main() {
 	maxDirs := make(chan struct{}, cfg.MaxDirs)
 	testChan := make(chan string, 100)
 
-	state.Client = client
+	globalState.Client = client
 
 	if cfg.BlacklistLocation != "" {
 		readerChan := make(chan string, 100)
 		go librecursebuster.LoadWords(cfg.BlacklistLocation, readerChan, printChan)
 		for x := range readerChan {
-			state.Blacklist[x] = true
+			globalState.Blacklist[x] = true
 		}
 	}
 
@@ -149,21 +170,22 @@ func main() {
 		readerChan := make(chan string, 100)
 		go librecursebuster.LoadWords(cfg.WhitelistLocation, readerChan, printChan)
 		for x := range readerChan {
-			state.Whitelist[x] = true
+			globalState.Whitelist[x] = true
 		}
 	}
 
-	if cfg.Wordlist != "" {
+	if cfg.Wordlist != "" && cfg.MaxDirs == 1 {
 
 		zerod := uint32(0)
-		state.DirbProgress = &zerod
+		globalState.DirbProgress = &zerod
 
 		zero := uint32(0)
-		state.WordlistLen = &zero
+		globalState.WordlistLen = &zero
+
 		readerChan := make(chan string, 100)
 		go librecursebuster.LoadWords(cfg.Wordlist, readerChan, printChan)
 		for _ = range readerChan {
-			*state.WordlistLen++
+			atomic.AddUint32(globalState.WordlistLen, 1)
 		}
 	}
 
@@ -174,45 +196,65 @@ func main() {
 	}
 
 	librecursebuster.PrintBanner(cfg)
-	prefix := h.String()
-	if len(prefix) > 0 && string(prefix[len(prefix)-1]) != "/" {
-		prefix = prefix + "/"
-	}
-	randURL := fmt.Sprintf("%s%s", prefix, canary)
-	resp, x, err := librecursebuster.HttpReq("GET", randURL, client, cfg)
-	if err != nil {
-		panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
-	}
-	librecursebuster.PrintOutput(
-		fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
-		librecursebuster.Debug, 2, wg, printChan,
-	)
 
-	state.Soft404ResponseBody = x
-	state.StartTime = time.Now()
-	state.PerSecondShort = new(uint64)
-	state.PerSecondLong = new(uint64)
+	//do first load of urls (send canary requests to make sure we can dirbust them)
 
-	go librecursebuster.StatusPrinter(cfg, state, wg, printChan, testChan)
-	go librecursebuster.ManageRequests(cfg, state, wg, pages, newPages, confirmed, workers, printChan, maxDirs, testChan)
-	go librecursebuster.ManageNewURLs(cfg, state, wg, pages, newPages, printChan)
+	globalState.StartTime = time.Now()
+	globalState.PerSecondShort = new(uint64)
+	globalState.PerSecondLong = new(uint64)
+
+	go librecursebuster.StatusPrinter(cfg, globalState, wg, printChan, testChan)
+	go librecursebuster.ManageRequests(cfg, globalState, wg, pages, newPages, confirmed, workers, printChan, maxDirs, testChan)
+	go librecursebuster.ManageNewURLs(cfg, globalState, wg, pages, newPages, printChan)
 	go librecursebuster.OutputWriter(wg, cfg, confirmed, cfg.Localpath, printChan)
-	go librecursebuster.StatsTracker(state)
-
-	firstPage := librecursebuster.SpiderPage{}
-	firstPage.Url = h.String()
-	seedPages = append(seedPages, firstPage)
-
-	if !strings.HasSuffix(h.String(), "/") {
-		seedPages = append(seedPages, librecursebuster.SpiderPage{
-			Url: h.String() + "/",
-		})
-	}
+	go librecursebuster.StatsTracker(globalState)
 
 	librecursebuster.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0, wg, printChan)
 
 	//seed the workers
-	for _, x := range seedPages {
+	for _, s := range URLSlice {
+		u, err := url.Parse(s)
+		if err != nil {
+			panic(err)
+		}
+
+		if u.Scheme == "" {
+			if cfg.HTTPS {
+				u, err = url.Parse("https://" + s)
+			} else {
+				u, err = url.Parse("http://" + s)
+			}
+		}
+
+		//do canary etc
+		prefix := u.String()
+		if len(prefix) > 0 && string(prefix[len(prefix)-1]) != "/" {
+			prefix = prefix + "/"
+		}
+		randURL := fmt.Sprintf("%s%s", prefix, canary)
+		resp, content, err := librecursebuster.HttpReq("GET", randURL, client, cfg)
+		if err != nil {
+			panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
+		}
+		librecursebuster.PrintOutput(
+			fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
+			librecursebuster.Debug, 2, wg, printChan,
+		)
+
+		globalState.Hosts.AddSoft404Content(u.Host, content) // Soft404ResponseBody = xx
+
+		x := librecursebuster.SpiderPage{}
+		x.URL = u.String()
+		x.Reference = u
+
+		if !strings.HasSuffix(u.String(), "/") {
+			wg.Add(1)
+			pages <- librecursebuster.SpiderPage{
+				URL:       h.String() + "/",
+				Reference: h,
+			}
+		}
+
 		wg.Add(1)
 		pages <- x
 	}

@@ -54,7 +54,7 @@ func OutputWriter(wg *sync.WaitGroup, cfg Config, confirmed chan SpiderPage, loc
 	}
 	for {
 		object := <-confirmed
-		page := object.Url
+		page := object.URL
 		if _, ok := pages[page]; !ok {
 			pages[page] = true
 			writeS := fmt.Sprintf(stringToWrite, page, object.Result.Status)
@@ -131,7 +131,7 @@ func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan O
 		if !cfg.NoStatus {
 			//assemble the status string
 			sprint := fmt.Sprintf("%s"+black.Sprintf(">"), status)
-			if cfg.MaxDirs == 1 {
+			if cfg.MaxDirs == 1 && cfg.Wordlist != "" {
 				//this is the grossest format string I ever did see
 				sprint += fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(state.DirbProgress))/float64(atomic.LoadUint32(state.WordlistLen)), testedURL)
 			} else {
