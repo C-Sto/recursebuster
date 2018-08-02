@@ -134,6 +134,12 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 		return headResp, content, success
 	}
 
+	//Check if we care about it (header only) section
+	if state.BadResponses[headResp.StatusCode] {
+		success = false
+		return headResp, content, success
+	}
+
 	//check we care about it (body only) section
 	//double check that it's not 404/error using smart blockchain AI tech
 	PrintOutput(
