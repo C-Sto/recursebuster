@@ -19,17 +19,18 @@ func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages
 			PrintOutput(fmt.Sprintf("Not testing blacklisted URL: %s", page.URL), Info, 0, wg, printChan)
 			continue
 		}
-
-		workers <- struct{}{}
-		wg.Add(1)
-		go testURL(cfg, state, wg, page.URL, state.Client, newPages, workers, confirmed, printChan, testChan)
-
-		if cfg.Wordlist != "" && string(page.URL[len(page.URL)-1]) == "/" { //if we are testing a directory
-
-			//check for wildcard response
-
+		for _, method := range state.Methods {
+			workers <- struct{}{}
 			wg.Add(1)
-			go dirBust(cfg, state, page, wg, workers, pages, newPages, confirmed, printChan, maxDirs, testChan)
+			go testURL(cfg, state, wg, method, page.URL, state.Client, newPages, workers, confirmed, printChan, testChan)
+
+			if cfg.Wordlist != "" && string(page.URL[len(page.URL)-1]) == "/" { //if we are testing a directory
+
+				//check for wildcard response
+
+				wg.Add(1)
+				go dirBust(cfg, state, page, wg, workers, pages, newPages, confirmed, printChan, maxDirs, testChan)
+			}
 		}
 		wg.Done()
 	}
@@ -126,7 +127,7 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 	}
 }
 
-func testURL(cfg Config, state State, wg *sync.WaitGroup, urlString string, client *http.Client,
+func testURL(cfg Config, state State, wg *sync.WaitGroup, method string, urlString string, client *http.Client,
 	newPages chan SpiderPage, workers chan struct{},
 	confirmedGood chan SpiderPage, printChan chan OutLine, testChan chan string) {
 	defer func() {
@@ -135,11 +136,11 @@ func testURL(cfg Config, state State, wg *sync.WaitGroup, urlString string, clie
 	}()
 
 	select {
-	case testChan <- urlString:
+	case testChan <- method + ":" + urlString:
 	default: //this is to prevent blocking, it doesn't _really_ matter if it doesn't get written to output
 	}
 
-	headResp, content, good := evaluateURL(wg, cfg, state, urlString, client, workers, printChan)
+	headResp, content, good := evaluateURL(wg, cfg, state, method, urlString, client, workers, printChan)
 
 	if !good && !cfg.ShowAll {
 		return
@@ -185,13 +186,13 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 		PrintOutput("This should never occur, url parse error on parsed url?"+err.Error(), Error, 0, wg, printChan)
 		return
 	}
-	//check to make sure we aren't dirbusting a wildcardyboi
+	//check to make sure we aren't dirbusting a wildcardyboi (NOTE!!! USES FIRST SPECIFIED MEHTOD TO DO SOFT 404!)
 	workers <- struct{}{}
-	_, x, res := evaluateURL(wg, cfg, state, page.URL+RandString(printChan), state.Client, workers, printChan)
+	_, x, res := evaluateURL(wg, cfg, state, state.Methods[0], page.URL+RandString(printChan), state.Client, workers, printChan)
 
 	if res { //true response indicates a good response for a guid path, unlikely good
 		if detectSoft404(x, state.Hosts.Get404Body(u.Host), cfg.Ratio404) {
-			//it's a soft404 probably, guess we can continue
+			//it's a soft404 probably, guess we can continue (this logic seems wrong??)
 		} else {
 			PrintOutput(
 				fmt.Sprintf("Wildcard repsonse detected, skipping dirbusting of %s", page.URL),
@@ -216,25 +217,27 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 	}
 	for word := range wordsChan { //will receive from the channel until it's closed
 		//read words off the channel, and test it
+		for _, method := range state.Methods {
 
-		if len(state.Extensions) > 0 && state.Extensions[0] != "" {
-			for _, ext := range state.Extensions {
+			if len(state.Extensions) > 0 && state.Extensions[0] != "" {
+				for _, ext := range state.Extensions {
+					workers <- struct{}{}
+					wg.Add(1)
+					go testURL(cfg, state, wg, method, page.URL+word+"."+ext, state.Client, newPages, workers, confirmed, printChan, testChan)
+				}
+			}
+			if cfg.AppendDir {
 				workers <- struct{}{}
 				wg.Add(1)
-				go testURL(cfg, state, wg, page.URL+word+"."+ext, state.Client, newPages, workers, confirmed, printChan, testChan)
+				go testURL(cfg, state, wg, method, page.URL+word+"/", state.Client, newPages, workers, confirmed, printChan, testChan)
 			}
-		}
-		if cfg.AppendDir {
 			workers <- struct{}{}
 			wg.Add(1)
-			go testURL(cfg, state, wg, page.URL+word+"/", state.Client, newPages, workers, confirmed, printChan, testChan)
-		}
-		workers <- struct{}{}
-		wg.Add(1)
-		go testURL(cfg, state, wg, page.URL+word, state.Client, newPages, workers, confirmed, printChan, testChan)
+			go testURL(cfg, state, wg, method, page.URL+word, state.Client, newPages, workers, confirmed, printChan, testChan)
 
-		if cfg.MaxDirs == 1 {
-			atomic.AddUint32(state.DirbProgress, 1)
+			if cfg.MaxDirs == 1 {
+				atomic.AddUint32(state.DirbProgress, 1)
+			}
 		}
 	}
 	<-maxDirs

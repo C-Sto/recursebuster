@@ -19,7 +19,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.1.0"
+const version = "1.2.0"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -48,6 +48,7 @@ func main() {
 	flag.BoolVar(&cfg.AppendDir, "appendslash", false, "Append a / to all directory bruteforce requests (like extension, but slash instead of .yourthing)")
 	flag.StringVar(&cfg.Auth, "auth", "", "Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.")
 	flag.StringVar(&cfg.BadResponses, "bad", "404", "Responses to consider 'bad' or 'not found'. Comma-separated This works the opposite way of gobuster!")
+	//flag.StringVar(&cfg.BodyContent, "body", "", "File containing content to send in the body of the request.") all empty body for now
 	flag.StringVar(&cfg.BlacklistLocation, "blacklist", "", "Blacklist of prefixes to not check. Will not check on exact matches.")
 	flag.StringVar(&cfg.Canary, "canary", "", "Custom value to use to check for wildcards")
 	flag.BoolVar(&cfg.CleanOutput, "clean", false, "Output clean URLs to the output file for easy loading into other tools and whatnot.")
@@ -61,10 +62,12 @@ func main() {
 	flag.BoolVar(&cfg.SSLIgnore, "k", false, "Ignore SSL check")
 	flag.BoolVar(&cfg.ShowLen, "len", false, "Show, and write the length of the response")
 	flag.BoolVar(&cfg.NoGet, "noget", false, "Do not perform a GET request (only use HEAD request/response)")
+	flag.BoolVar(&cfg.NoHead, "nohead", false, "Don't optimize GET requests with a HEAD (only send the GET)")
 	flag.BoolVar(&cfg.NoRecursion, "norecursion", false, "Disable recursion, just work on the specified directory. Also disables spider function.")
 	flag.BoolVar(&cfg.NoSpider, "nospider", false, "Don't search the page body for links, and directories to add to the spider queue.")
 	flag.BoolVar(&cfg.NoStatus, "nostatus", false, "Don't print status info (for if it messes with the terminal)")
 	flag.StringVar(&cfg.Localpath, "o", "."+string(os.PathSeparator)+"busted.txt", "Local file to dump into")
+	flag.StringVar(&cfg.Methods, "methods", "GET", "Methods to use for checks. Multiple methods can be specified, comma separate them. Requests will be sent with an empty body (unless body is specified)")
 	flag.StringVar(&cfg.ProxyAddr, "proxy", "", "Proxy configuration options in the form ip:port eg: 127.0.0.1:9050. Note! If you want this to work with burp/use it with a HTTP proxy, specify as http://ip:port")
 	flag.Float64Var(&cfg.Ratio404, "ratio", 0.95, "Similarity ratio to the 404 canary page.")
 	flag.BoolVar(&cfg.FollowRedirects, "redirect", false, "Follow redirects")
@@ -134,6 +137,10 @@ func main() {
 
 	for _, x := range strings.Split(cfg.Extensions, ",") {
 		globalState.Extensions = append(globalState.Extensions, x)
+	}
+
+	for _, x := range strings.Split(cfg.Methods, ",") {
+		globalState.Methods = append(globalState.Methods, x)
 	}
 
 	for _, x := range strings.Split(cfg.BadResponses, ",") {

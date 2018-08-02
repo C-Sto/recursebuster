@@ -43,25 +43,25 @@ func OutputWriter(wg *sync.WaitGroup, cfg Config, confirmed chan SpiderPage, loc
 	}
 	defer file.Close()
 
-	stringToWrite := "%s [%s]"
-	stringToPrint := "Found %s [%s]"
+	stringToWrite := "%s %s [%s]"
+	stringToPrint := "Found %s %s [%s]"
 	if cfg.ShowLen {
-		stringToWrite = "%s [%s] Length: %v"
-		stringToPrint = "Found %s [%s] Length: %v"
+		stringToWrite = "%s %s [%s] Length: %v"
+		stringToPrint = "%s Found %s [%s] Length: %v"
 	}
 	if cfg.CleanOutput {
-		stringToWrite = "%s\n"
+		stringToWrite = "%s"
 	}
 	for {
 		object := <-confirmed
 		page := object.URL
 		if _, ok := pages[page]; !ok {
 			pages[page] = true
-			writeS := fmt.Sprintf(stringToWrite, page, object.Result.Status)
-			printS := fmt.Sprintf(stringToPrint, page, object.Result.Status)
+			writeS := fmt.Sprintf(stringToWrite, object.Result.Request.Method, page, object.Result.Status)
+			printS := fmt.Sprintf(stringToPrint, object.Result.Request.Method, page, object.Result.Status)
 			if cfg.ShowLen {
-				writeS = fmt.Sprintf(stringToWrite, page, object.Result.Status, object.Result.ContentLength)
-				printS = fmt.Sprintf(stringToPrint, page, object.Result.Status, object.Result.ContentLength)
+				writeS = fmt.Sprintf(stringToWrite, object.Result.Request.Method, page, object.Result.Status, object.Result.ContentLength)
+				printS = fmt.Sprintf(stringToPrint, object.Result.Request.Method, page, object.Result.Status, object.Result.ContentLength)
 			}
 			if object.Result.StatusCode >= 300 && object.Result.StatusCode < 400 {
 				//must be a 300ish redirect

@@ -93,6 +93,7 @@ type State struct {
 	Whitelist      map[string]bool
 	BadResponses   map[int]bool //response codes to consider *dont care* (this might be worth putting in per host state, but idk how)
 	Extensions     []string
+	Methods        []string
 	WordlistLen    *uint32
 	DirbProgress   *uint32
 
@@ -144,6 +145,7 @@ type Config struct {
 	AppendDir         bool
 	Auth              string
 	BadResponses      string
+	BodyContent       string
 	BlacklistLocation string
 	BurpMode          bool
 	Canary            string
@@ -157,7 +159,9 @@ type Config struct {
 	InputList         string
 	Localpath         string
 	MaxDirs           int
+	Methods           string
 	NoGet             bool
+	NoHead            bool
 	NoRecursion       bool
 	NoSpider          bool
 	NoStatus          bool
@@ -196,6 +200,7 @@ func (i *ArrayStringFlag) Get() []string {
 //SpiderPage represents a 'working' page object, represented by an URL and it's (optional)result.
 type SpiderPage struct {
 	URL       string
+	method    string
 	Result    *http.Response
 	Reference *url.URL //where did we get this URL from? (for the logic portion)
 }

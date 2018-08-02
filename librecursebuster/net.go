@@ -89,45 +89,50 @@ func HttpReq(method, path string, client *http.Client, cfg Config) (*http.Respon
 	return resp, body, err
 }
 
-func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
+func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
 	success = true
-	headResp, _, err := HttpReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
-	if err != nil {
-		success = false
-		<-workers //done with the net thread
-		PrintOutput(fmt.Sprintf("%s", err), Error, 0, wg, printChan)
-		return
-	}
 
-	//Check if we care about it (header only) section
-	if state.BadResponses[headResp.StatusCode] {
-		success = false
-		<-workers
-		return
-	}
-
-	//this is all we have to do if we aren't doing GET's
-	if cfg.NoGet {
-		if cfg.BurpMode { //send successful request again... twice as many requests, but less burp spam
-
-			client = ConfigureHTTPClient(cfg, wg, printChan, true)
-			HttpReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
+	//optimize GET requests by sending a head first (it's cheaper)
+	if method == "GET" {
+		headResp, _, err := HttpReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
+		if err != nil {
+			success = false
+			<-workers //done with the net thread
+			PrintOutput(fmt.Sprintf("%s", err), Error, 0, wg, printChan)
+			return headResp, content, success
 		}
-		<-workers
-		return
-	}
 
+		//Check if we care about it (header only) section
+		if state.BadResponses[headResp.StatusCode] {
+			success = false
+			<-workers
+			return headResp, content, success
+		}
+
+		//this is all we have to do if we aren't doing GET's
+		if cfg.NoGet {
+			if cfg.BurpMode { //send successful request again... twice as many requests, but less burp spam
+
+				client = ConfigureHTTPClient(cfg, wg, printChan, true)
+				HttpReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
+			}
+			<-workers
+			return headResp, content, success
+		}
+	} else {
+
+	}
 	//get content from validated path/file thing
 	if cfg.BurpMode {
 		client = ConfigureHTTPClient(cfg, wg, printChan, true)
 	}
-	headResp, content, err = HttpReq("GET", urlString, client, cfg)
+	headResp, content, err := HttpReq(method, urlString, client, cfg)
 	<-workers //done with the net thread
 	if err != nil {
 		success = false
 		PrintOutput(fmt.Sprintf("%s", err), Error, 0, wg, printChan)
 
-		return //probably handle better
+		return headResp, content, success
 	}
 
 	//check we care about it (body only) section
