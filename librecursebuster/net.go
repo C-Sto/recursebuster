@@ -93,7 +93,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 	success = true
 
 	//optimize GET requests by sending a head first (it's cheaper)
-	if method == "GET" {
+	if method == "GET" && !cfg.NoHead {
 		headResp, _, err := HttpReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
 		if err != nil {
 			success = false
@@ -121,10 +121,6 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 		}
 	}
 
-	//get content from validated path/file thing
-	if cfg.BurpMode {
-		client = ConfigureHTTPClient(cfg, wg, printChan, true)
-	}
 	headResp, content, err := HttpReq(method, urlString, client, cfg)
 	<-workers //done with the net thread
 	if err != nil {
@@ -138,6 +134,12 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 	if state.BadResponses[headResp.StatusCode] {
 		success = false
 		return headResp, content, success
+	}
+
+	//get content from validated path/file thing
+	if cfg.BurpMode {
+		client = ConfigureHTTPClient(cfg, wg, printChan, true)
+		HttpReq(method, urlString, client, cfg)
 	}
 
 	//check we care about it (body only) section
