@@ -119,9 +119,8 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 			<-workers
 			return headResp, content, success
 		}
-	} else {
-
 	}
+
 	//get content from validated path/file thing
 	if cfg.BurpMode {
 		client = ConfigureHTTPClient(cfg, wg, printChan, true)
@@ -145,9 +144,9 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 	if detectSoft404(content, state.Hosts.Get404Body(headResp.Request.Host), cfg.Ratio404) {
 		success = false
 		//seems to be a soft 404 lol
-		return
+		return headResp, content, success
 	}
-	return
+	return headResp, content, true
 }
 
 func RedirectHandler(req *http.Request, via []*http.Request) error {
