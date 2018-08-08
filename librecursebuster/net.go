@@ -136,6 +136,16 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 		return headResp, content, success
 	}
 
+	if len(cfg.BadHeader) > 0 {
+		for _, x := range cfg.BadHeader {
+			spl := strings.Split(x, ":")
+			if headResp.Header.Get(spl[0]) == spl[1] {
+				return headResp, content, false
+			}
+		}
+	}
+	//if state.BadHeaders[headResp.Header.]
+
 	//get content from validated path/file thing
 	if cfg.BurpMode {
 		client = ConfigureHTTPClient(cfg, wg, printChan, true)

@@ -145,6 +145,7 @@ type Config struct {
 	AppendDir         bool
 	Auth              string
 	BadResponses      string
+	BadHeader         ArrayStringFlag
 	BodyContent       string
 	BlacklistLocation string
 	BurpMode          bool
