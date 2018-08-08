@@ -139,7 +139,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 	if len(cfg.BadHeader) > 0 {
 		for _, x := range cfg.BadHeader {
 			spl := strings.Split(x, ":")
-			if headResp.Header.Get(spl[0]) == strings.Join(spl[1:], "") {
+			if strings.HasPrefix(headResp.Header.Get(spl[0]), strings.Join(spl[1:], "")) {
 				return headResp, content, false
 			}
 		}
