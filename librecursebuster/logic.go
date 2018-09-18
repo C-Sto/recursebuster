@@ -20,10 +20,11 @@ func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages
 			continue
 		}
 		for _, method := range state.Methods {
-			workers <- struct{}{}
-			wg.Add(1)
-			go testURL(cfg, state, wg, method, page.URL, state.Client, newPages, workers, confirmed, printChan, testChan)
-
+			if !cfg.NoBase {
+				workers <- struct{}{}
+				wg.Add(1)
+				go testURL(cfg, state, wg, method, page.URL, state.Client, newPages, workers, confirmed, printChan, testChan)
+			}
 			if cfg.Wordlist != "" && string(page.URL[len(page.URL)-1]) == "/" { //if we are testing a directory
 
 				//check for wildcard response
@@ -187,31 +188,33 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 		return
 	}
 	//check to make sure we aren't dirbusting a wildcardyboi (NOTE!!! USES FIRST SPECIFIED MEHTOD TO DO SOFT 404!)
-	workers <- struct{}{}
-	_, x, res := evaluateURL(wg, cfg, state, state.Methods[0], page.URL+RandString(printChan), state.Client, workers, printChan)
+	if !cfg.NoWildcardChecks {
+		workers <- struct{}{}
+		_, x, res := evaluateURL(wg, cfg, state, state.Methods[0], page.URL+RandString(printChan), state.Client, workers, printChan)
 
-	if res { //true response indicates a good response for a guid path, unlikely good
-		if detectSoft404(x, state.Hosts.Get404Body(u.Host), cfg.Ratio404) {
-			//it's a soft404 probably, guess we can continue (this logic seems wrong??)
-		} else {
-			PrintOutput(
-				fmt.Sprintf("Wildcard repsonse detected, skipping dirbusting of %s", page.URL),
-				Info, 0, wg, printChan)
-			return
+		if res { //true response indicates a good response for a guid path, unlikely good
+			if detectSoft404(x, state.Hosts.Get404Body(u.Host), cfg.Ratio404) {
+				//it's a soft404 probably, guess we can continue (this logic seems wrong??)
+			} else {
+				PrintOutput(
+					fmt.Sprintf("Wildcard repsonse detected, skipping dirbusting of %s", page.URL),
+					Info, 0, wg, printChan)
+				return
+			}
 		}
 	}
-
 	maxDirs <- struct{}{}
 
 	//load in the wordlist to a channel (can probs be async)
 	wordsChan := make(chan string, 300) //don't expect we will need it much bigger than this
 
 	go LoadWords(cfg.Wordlist, wordsChan, printChan) //wordlist management doesn't need waitgroups, because of the following range statement
-
-	PrintOutput(
-		fmt.Sprintf("Dirbusting %s", page.URL),
-		Info, 0, wg, printChan,
-	)
+	if !cfg.NoStartStop {
+		PrintOutput(
+			fmt.Sprintf("Dirbusting %s", page.URL),
+			Info, 0, wg, printChan,
+		)
+	}
 	if cfg.MaxDirs == 1 {
 		atomic.StoreUint32(state.DirbProgress, 0)
 	}
@@ -241,7 +244,7 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 		}
 	}
 	<-maxDirs
-
-	PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0, wg, printChan)
-
+	if !cfg.NoStartStop {
+		PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0, wg, printChan)
+	}
 }

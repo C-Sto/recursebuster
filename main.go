@@ -19,7 +19,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.3.4"
+const version = "1.3.5"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -62,11 +62,14 @@ func main() {
 	flag.StringVar(&cfg.InputList, "iL", "", "File to use as an input list of URL's to start from")
 	flag.BoolVar(&cfg.SSLIgnore, "k", false, "Ignore SSL check")
 	flag.BoolVar(&cfg.ShowLen, "len", false, "Show, and write the length of the response")
+	flag.BoolVar(&cfg.NoBase, "nobase", false, "Don't perform a request to the base URL")
 	flag.BoolVar(&cfg.NoGet, "noget", false, "Do not perform a GET request (only use HEAD request/response)")
 	flag.BoolVar(&cfg.NoHead, "nohead", false, "Don't optimize GET requests with a HEAD (only send the GET)")
 	flag.BoolVar(&cfg.NoRecursion, "norecursion", false, "Disable recursion, just work on the specified directory. Also disables spider function.")
 	flag.BoolVar(&cfg.NoSpider, "nospider", false, "Don't search the page body for links, and directories to add to the spider queue.")
 	flag.BoolVar(&cfg.NoStatus, "nostatus", false, "Don't print status info (for if it messes with the terminal)")
+	flag.BoolVar(&cfg.NoStartStop, "nostartstop", false, "Don't show start/stop info messages")
+	flag.BoolVar(&cfg.NoWildcardChecks, "nowildcard", false, "Don't perform wildcard checks for soft 404 detection")
 	flag.StringVar(&cfg.Localpath, "o", "."+string(os.PathSeparator)+"busted.txt", "Local file to dump into")
 	flag.StringVar(&cfg.Methods, "methods", "GET", "Methods to use for checks. Multiple methods can be specified, comma separate them. Requests will be sent with an empty body (unless body is specified)")
 	flag.StringVar(&cfg.ProxyAddr, "proxy", "", "Proxy configuration options in the form ip:port eg: 127.0.0.1:9050. Note! If you want this to work with burp/use it with a HTTP proxy, specify as http://ip:port")
@@ -243,27 +246,32 @@ func main() {
 		randURL := fmt.Sprintf("%s%s", prefix, canary)
 		workers <- struct{}{}
 		go func() {
-			resp, content, err := librecursebuster.HttpReq("GET", randURL, client, cfg)
-			<-workers
-			if err != nil {
-				if cfg.InputList != "" {
-					printChan <- librecursebuster.OutLine{
-						Content: err.Error(),
-						Type:    librecursebuster.Error,
-						Level:   0,
+			if !cfg.NoWildcardChecks {
+				resp, content, err := librecursebuster.HttpReq("GET", randURL, client, cfg)
+				<-workers
+				if err != nil {
+					if cfg.InputList != "" {
+						librecursebuster.PrintOutput(
+							err.Error(),
+							librecursebuster.Error,
+							0,
+							wg,
+							printChan,
+						)
+						return
 					}
-					return
+					panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
+
 				}
-				panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
+				librecursebuster.PrintOutput(
+					fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
+					librecursebuster.Debug, 2, wg, printChan,
+				)
 
+				globalState.Hosts.AddSoft404Content(u.Host, content) // Soft404ResponseBody = xx
+			} else {
+				<-workers
 			}
-			librecursebuster.PrintOutput(
-				fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
-				librecursebuster.Debug, 2, wg, printChan,
-			)
-
-			globalState.Hosts.AddSoft404Content(u.Host, content) // Soft404ResponseBody = xx
-
 			x := librecursebuster.SpiderPage{}
 			x.URL = u.String()
 			x.Reference = u

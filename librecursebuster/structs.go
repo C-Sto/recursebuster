@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/fatih/color"
@@ -104,30 +105,40 @@ type State struct {
 
 //HostStates represents the interface to the Host States..? (all this smells of bad hacks)
 type HostStates struct {
+	mu    *sync.RWMutex
 	hosts map[string]HostState
 }
 
 //Init initialises the map because apparently OO is hard to do
 func (hs *HostStates) Init() {
+	hs.mu = &sync.RWMutex{}
 	hs.hosts = make(map[string]HostState)
 }
 
 //AddHost adds a host to the hosts lol
 func (hs *HostStates) AddHost(u *url.URL) {
+	hs.mu.Lock()
+	defer hs.mu.Unlock()
 	hs.hosts[u.Host] = HostState{ParsedURL: u}
 }
 
 //AddSoft404Content sets the soft404 content retreived using the canary request to be compared against during the hacking phase
 func (hs *HostStates) AddSoft404Content(host string, content []byte) {
+	hs.mu.Lock()
+	defer hs.mu.Unlock()
 	hs.hosts[host] = HostState{ParsedURL: hs.hosts[host].ParsedURL, Soft404ResponseBody: content}
 }
 
 func (hs *HostStates) Get404Body(host string) []byte {
+	hs.mu.RLock()
+	defer hs.mu.RUnlock()
 	return hs.hosts[host].Soft404ResponseBody
 }
 
 //HostExists checks to see if the host string specified exists within the hosts states??
 func (hs HostStates) HostExists(hval string) bool {
+	hs.mu.RLock()
+	defer hs.mu.RUnlock()
 	_, ok := hs.hosts[hval]
 	return ok
 }
@@ -160,11 +171,14 @@ type Config struct {
 	Localpath         string
 	MaxDirs           int
 	Methods           string
+	NoBase            bool
 	NoGet             bool
 	NoHead            bool
 	NoRecursion       bool
 	NoSpider          bool
 	NoStatus          bool
+	NoStartStop       bool
+	NoWildcardChecks  bool
 	ProxyAddr         string
 	Ratio404          float64
 	ShowAll           bool
