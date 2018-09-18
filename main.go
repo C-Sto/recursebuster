@@ -19,7 +19,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.3.3"
+const version = "1.3.4"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -235,36 +235,51 @@ func main() {
 		}
 
 		//do canary etc
+
 		prefix := u.String()
 		if len(prefix) > 0 && string(prefix[len(prefix)-1]) != "/" {
 			prefix = prefix + "/"
 		}
 		randURL := fmt.Sprintf("%s%s", prefix, canary)
-		resp, content, err := librecursebuster.HttpReq("GET", randURL, client, cfg)
-		if err != nil {
-			panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
-		}
-		librecursebuster.PrintOutput(
-			fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
-			librecursebuster.Debug, 2, wg, printChan,
-		)
+		workers <- struct{}{}
+		go func() {
+			resp, content, err := librecursebuster.HttpReq("GET", randURL, client, cfg)
+			<-workers
+			if err != nil {
+				if cfg.InputList != "" {
+					printChan <- librecursebuster.OutLine{
+						Content: err.Error(),
+						Type:    librecursebuster.Error,
+						Level:   0,
+					}
+					return
+				}
+				panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
 
-		globalState.Hosts.AddSoft404Content(u.Host, content) // Soft404ResponseBody = xx
-
-		x := librecursebuster.SpiderPage{}
-		x.URL = u.String()
-		x.Reference = u
-
-		if !strings.HasSuffix(u.String(), "/") {
-			wg.Add(1)
-			pages <- librecursebuster.SpiderPage{
-				URL:       h.String() + "/",
-				Reference: h,
 			}
-		}
+			librecursebuster.PrintOutput(
+				fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
+				librecursebuster.Debug, 2, wg, printChan,
+			)
 
-		wg.Add(1)
-		pages <- x
+			globalState.Hosts.AddSoft404Content(u.Host, content) // Soft404ResponseBody = xx
+
+			x := librecursebuster.SpiderPage{}
+			x.URL = u.String()
+			x.Reference = u
+
+			if !strings.HasSuffix(u.String(), "/") {
+				wg.Add(1)
+				pages <- librecursebuster.SpiderPage{
+					URL:       u.String() + "/",
+					Reference: u,
+				}
+			}
+
+			wg.Add(1)
+			pages <- x
+		}()
+
 	}
 
 	//wait for completion

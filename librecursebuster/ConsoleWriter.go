@@ -8,7 +8,7 @@ import (
 )
 
 type ConsoleWriter struct {
-	mu     sync.Mutex
+	mu     *sync.Mutex
 	prefix string
 	flag   int
 	out    io.Writer
@@ -54,7 +54,8 @@ func itoa(buf *[]byte, i int, wid int) {
 }
 
 func (ConsoleWriter) New(w io.Writer, prefix string) *ConsoleWriter {
-	return &ConsoleWriter{out: w, prefix: prefix, flag: 0}
+	m := &sync.Mutex{}
+	return &ConsoleWriter{out: w, prefix: prefix, flag: 0, mu: m}
 }
 
 func (l *ConsoleWriter) Output(calldepth int, s string) error {

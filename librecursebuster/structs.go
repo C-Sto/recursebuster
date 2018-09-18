@@ -18,11 +18,10 @@ var (
 	Good5 *ConsoleWriter //*log.Logger
 	Goodx *ConsoleWriter //*log.Logger
 
-	Info    *ConsoleWriter
-	Warning *ConsoleWriter
-	Debug   *ConsoleWriter
-	Error   *ConsoleWriter
-	Status  *ConsoleWriter
+	Info   *ConsoleWriter
+	Debug  *ConsoleWriter
+	Error  *ConsoleWriter
+	Status *ConsoleWriter
 )
 
 //InitLogger initialises the output writer stuff
