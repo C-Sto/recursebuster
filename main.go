@@ -93,6 +93,12 @@ func main() {
 		}()
 	}
 
+	if !cfg.NoUI {
+		wg.Add(1)
+		go globalState.StartUI()
+
+	}
+
 	if showVersion {
 		librecursebuster.PrintBanner(cfg)
 		os.Exit(0)

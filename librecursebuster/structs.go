@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jroimartin/gocui"
+
 	"github.com/fatih/color"
 )
 
@@ -97,6 +99,7 @@ type State struct {
 	WordlistLen    *uint32
 	DirbProgress   *uint32
 
+	ui *gocui.Gui
 	//per host States
 	Hosts HostStates
 	//ParsedURL           *url.URL
@@ -178,6 +181,7 @@ type Config struct {
 	NoSpider          bool
 	NoStatus          bool
 	NoStartStop       bool
+	NoUI              bool
 	NoWildcardChecks  bool
 	ProxyAddr         string
 	Ratio404          float64
