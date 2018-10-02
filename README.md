@@ -1,5 +1,7 @@
 # RecurseBuster
 
+[![Go Basic Checks]](https://goreportcard.com/badge/github.com/c-sto/recursebuster)](https://goreportcard.com/report/github.com/c-sto/recursebuster)
+
 It's like gobuster, but recursive!
 
 I wanted a recursive directory brute forcer that was fast, and had certain features. It didn't exist, so I started writing this. In reality, I'll probably merge a lot of the functionality into github.com/swarley7/gograbber since that solves a similar problem and has cool features that I don't want to implement (phantomjs, ugh). For now, here it be!
