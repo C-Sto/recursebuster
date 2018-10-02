@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-//PrintBanner will print the banner, and if debug mode is set will show all the options
 func PrintBanner(cfg Config) {
 	//todo: include settings in banner
 	fmt.Println(strings.Repeat("=", 20))
@@ -35,7 +34,6 @@ func printOpts(s Config) {
 
 }
 
-//OutputWriter will write to standard out, and also to file based on results pushed to the 'confirmed' channel
 func OutputWriter(wg *sync.WaitGroup, cfg Config, confirmed chan SpiderPage, localPath string, printChan chan OutLine) {
 	//output worker
 	pages := make(map[string]bool) //keep it unique
@@ -94,7 +92,6 @@ func OutputWriter(wg *sync.WaitGroup, cfg Config, confirmed chan SpiderPage, loc
 	}
 }
 
-//PrintOutput should be the _only_ way of writing to the print channel. Todo: make the push async/unblocking
 func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sync.WaitGroup, printChan chan OutLine) {
 	wg.Add(1)
 	printChan <- OutLine{
@@ -104,7 +101,6 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sy
 	}
 }
 
-//StatusPrinter periodically prints the status
 func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
 	tick := time.NewTicker(time.Second * 2)
 	status := getStatus(state)
