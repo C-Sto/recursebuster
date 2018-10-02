@@ -236,6 +236,10 @@ func main() {
 				u, err = url.Parse("http://" + s)
 			}
 		}
+		if err != nil {
+			//this should never actually happen
+			panic(err)
+		}
 
 		//do canary etc
 

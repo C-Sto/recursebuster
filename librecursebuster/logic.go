@@ -197,7 +197,7 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 				//it's a soft404 probably, guess we can continue (this logic seems wrong??)
 			} else {
 				PrintOutput(
-					fmt.Sprintf("Wildcard repsonse detected, skipping dirbusting of %s", page.URL),
+					fmt.Sprintf("Wildcard response detected, skipping dirbusting of %s", page.URL),
 					Info, 0, wg, printChan)
 				return
 			}

@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+//PrintBanner prints the banner and in debug mode will also print all set options
 func PrintBanner(cfg Config) {
 	//todo: include settings in banner
 	fmt.Println(strings.Repeat("=", 20))
@@ -34,6 +35,7 @@ func printOpts(s Config) {
 
 }
 
+//OutputWriter will write to a file and the screen
 func OutputWriter(wg *sync.WaitGroup, cfg Config, confirmed chan SpiderPage, localPath string, printChan chan OutLine) {
 	//output worker
 	pages := make(map[string]bool) //keep it unique
@@ -92,6 +94,7 @@ func OutputWriter(wg *sync.WaitGroup, cfg Config, confirmed chan SpiderPage, loc
 	}
 }
 
+//PrintOutput used to send output to the screen
 func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sync.WaitGroup, printChan chan OutLine) {
 	wg.Add(1)
 	printChan <- OutLine{
@@ -101,6 +104,7 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sy
 	}
 }
 
+//StatusPrinter is the function that performs all the status printing logic
 func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
 	tick := time.NewTicker(time.Second * 2)
 	status := getStatus(state)
@@ -158,11 +162,12 @@ func getStatus(s State) string {
 	)
 }
 
+//StatsTracker updates the stats every so often
 func StatsTracker(state State) {
 	tick := time.NewTicker(time.Second * 2)
 	testedBefore := atomic.LoadUint64(state.TotalTested)
 	timeBefore := time.Now()
-	for _ = range tick.C {
+	for range tick.C {
 		testedNow := atomic.LoadUint64(state.TotalTested)
 
 		//calculate short average (tested since last tick)
