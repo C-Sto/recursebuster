@@ -1,6 +1,6 @@
 # RecurseBuster
 
-[![Go Basic Checks]](https://goreportcard.com/badge/github.com/c-sto/recursebuster)](https://goreportcard.com/report/github.com/c-sto/recursebuster)
+[![Go Basic Checks](https://goreportcard.com/badge/github.com/c-sto/recursebuster)](https://goreportcard.com/report/github.com/c-sto/recursebuster)
 
 It's like gobuster, but recursive!
 
