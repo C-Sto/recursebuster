@@ -19,7 +19,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.4.1"
+const version = "1.4.2"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -250,53 +250,55 @@ func main() {
 		randURL := fmt.Sprintf("%s%s", prefix, canary)
 		wg.Add(1)
 		workers <- struct{}{}
-		go func() {
-			defer wg.Done()
-			if !cfg.NoWildcardChecks {
-				resp, content, err := librecursebuster.HttpReq("GET", randURL, client, cfg)
-				<-workers
-				if err != nil {
-					if cfg.InputList != "" {
-						librecursebuster.PrintOutput(
-							err.Error(),
-							librecursebuster.Error,
-							0,
-							wg,
-							printChan,
-						)
-						return
-					}
-					panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
-
-				}
-				librecursebuster.PrintOutput(
-					fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
-					librecursebuster.Debug, 2, wg, printChan,
-				)
-
-				globalState.Hosts.AddSoft404Content(u.Host, content) // Soft404ResponseBody = xx
-			} else {
-				<-workers
-			}
-			x := librecursebuster.SpiderPage{}
-			x.URL = u.String()
-			x.Reference = u
-
-			if !strings.HasSuffix(u.String(), "/") {
-				wg.Add(1)
-				pages <- librecursebuster.SpiderPage{
-					URL:       u.String() + "/",
-					Reference: u,
-				}
-			}
-
-			wg.Add(1)
-			pages <- x
-		}()
+		go startBusting(wg, globalState, cfg, client, workers, printChan, pages, randURL, *u)
 
 	}
 
 	//wait for completion
 	wg.Wait()
 
+}
+
+func startBusting(wg *sync.WaitGroup, globalState librecursebuster.State, cfg librecursebuster.Config, client *http.Client, workers chan struct{}, printChan chan librecursebuster.OutLine, pages chan librecursebuster.SpiderPage, randURL string, u url.URL) {
+	defer wg.Done()
+	if !cfg.NoWildcardChecks {
+		resp, content, err := librecursebuster.HTTPReq("GET", randURL, client, cfg)
+		<-workers
+		if err != nil {
+			if cfg.InputList != "" {
+				librecursebuster.PrintOutput(
+					err.Error(),
+					librecursebuster.Error,
+					0,
+					wg,
+					printChan,
+				)
+				return
+			}
+			panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
+
+		}
+		librecursebuster.PrintOutput(
+			fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
+			librecursebuster.Debug, 2, wg, printChan,
+		)
+
+		globalState.Hosts.AddSoft404Content(u.Host, content) // Soft404ResponseBody = xx
+	} else {
+		<-workers
+	}
+	x := librecursebuster.SpiderPage{}
+	x.URL = u.String()
+	x.Reference = &u
+
+	if !strings.HasSuffix(u.String(), "/") {
+		wg.Add(1)
+		pages <- librecursebuster.SpiderPage{
+			URL:       u.String() + "/",
+			Reference: &u,
+		}
+	}
+
+	wg.Add(1)
+	pages <- x
 }
