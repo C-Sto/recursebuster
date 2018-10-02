@@ -19,7 +19,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.4.0"
+const version = "1.4.1"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -244,8 +244,10 @@ func main() {
 			prefix = prefix + "/"
 		}
 		randURL := fmt.Sprintf("%s%s", prefix, canary)
+		wg.Add(1)
 		workers <- struct{}{}
 		go func() {
+			defer wg.Done()
 			if !cfg.NoWildcardChecks {
 				resp, content, err := librecursebuster.HttpReq("GET", randURL, client, cfg)
 				<-workers
