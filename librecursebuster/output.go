@@ -11,7 +11,7 @@ import (
 )
 
 //PrintBanner prints the banner and in debug mode will also print all set options
-func PrintBanner(cfg Config) {
+func PrintBanner(cfg *Config) {
 	//todo: include settings in banner
 	fmt.Println(strings.Repeat("=", 20))
 	fmt.Println("recursebuster V" + cfg.Version)
@@ -25,7 +25,7 @@ func PrintBanner(cfg Config) {
 }
 
 //stolen from swarlz
-func printOpts(s Config) {
+func printOpts(s *Config) {
 	keys := reflect.ValueOf(&s).Elem()
 	typeOfT := keys.Type()
 	for i := 0; i < keys.NumField(); i++ {
@@ -36,7 +36,7 @@ func printOpts(s Config) {
 }
 
 //OutputWriter will write to a file and the screen
-func OutputWriter(wg *sync.WaitGroup, cfg Config, confirmed chan SpiderPage, localPath string, printChan chan OutLine) {
+func OutputWriter(wg *sync.WaitGroup, cfg *Config, confirmed chan SpiderPage, localPath string, printChan chan OutLine) {
 	//output worker
 	pages := make(map[string]bool) //keep it unique
 	file, err := os.OpenFile(localPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
@@ -108,7 +108,7 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sy
 }
 
 //StatusPrinter is the function that performs all the status printing logic
-func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
+func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
 	tick := time.NewTicker(time.Second * 2)
 	status := getStatus(state)
 	spacesToClear := 0
@@ -156,7 +156,7 @@ func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan O
 	}
 }
 
-func getStatus(s State) string {
+func getStatus(s *State) string {
 
 	return fmt.Sprintf("Tested: %d Speed(2s): %d/s Speed: %d/s",
 		atomic.LoadUint64(s.TotalTested),
@@ -166,7 +166,7 @@ func getStatus(s State) string {
 }
 
 //StatsTracker updates the stats every so often
-func StatsTracker(state State) {
+func StatsTracker(state *State) {
 	tick := time.NewTicker(time.Second * 2)
 	testedBefore := atomic.LoadUint64(state.TotalTested)
 	timeBefore := time.Now()

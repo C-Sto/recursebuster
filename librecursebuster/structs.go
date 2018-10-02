@@ -85,6 +85,7 @@ type State struct {
 
 	//global State values
 	Client         *http.Client
+	BurpClient     *http.Client
 	TotalTested    *uint64
 	PerSecondShort *uint64 //how many tested over 2 seconds or so
 	PerSecondLong  *uint64
@@ -184,6 +185,7 @@ type Config struct {
 	Ratio404          float64
 	ShowAll           bool
 	ShowLen           bool
+	ShowVersion       bool
 	SSLIgnore         bool
 	Threads           int
 	Timeout           int

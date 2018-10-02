@@ -15,7 +15,7 @@ import (
 )
 
 //ConfigureHTTPClient configures and returns a HTTP Client (mostly useful to be able to send to burp)
-func ConfigureHTTPClient(cfg Config, wg *sync.WaitGroup, printChan chan OutLine, sendToBurpOnly bool) *http.Client {
+func ConfigureHTTPClient(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine, sendToBurpOnly bool) *http.Client {
 
 	httpTransport := &http.Transport{MaxIdleConns: 100}
 	client := &http.Client{Transport: httpTransport, Timeout: time.Duration(cfg.Timeout) * time.Second}
@@ -56,7 +56,7 @@ func ConfigureHTTPClient(cfg Config, wg *sync.WaitGroup, printChan chan OutLine,
 
 //HTTPReq sends the HTTP request based on the given settings, returns the response and the body
 //todo: This can probably be optimized to exit once the head has been retreived and discard the body
-func HTTPReq(method, path string, client *http.Client, cfg Config) (*http.Response, []byte, error) {
+func HTTPReq(method, path string, client *http.Client, cfg *Config) (*http.Response, []byte, error) {
 	req, err := http.NewRequest(method, path, nil)
 
 	if err != nil {
@@ -92,7 +92,7 @@ func HTTPReq(method, path string, client *http.Client, cfg Config) (*http.Respon
 	return resp, body, err
 }
 
-func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
+func evaluateURL(wg *sync.WaitGroup, cfg *Config, state *State, method string, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
 	success = true
 
 	//optimize GET requests by sending a head first (it's cheaper)
@@ -115,9 +115,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 		//this is all we have to do if we aren't doing GET's
 		if cfg.NoGet {
 			if cfg.BurpMode { //send successful request again... twice as many requests, but less burp spam
-
-				client = ConfigureHTTPClient(cfg, wg, printChan, true)
-				HTTPReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
+				HTTPReq("HEAD", urlString, state.BurpClient, cfg) //send a HEAD. Ignore body response
 			}
 			<-workers
 			return headResp, content, success
@@ -151,8 +149,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 
 	//get content from validated path/file thing
 	if cfg.BurpMode {
-		client = ConfigureHTTPClient(cfg, wg, printChan, true)
-		HTTPReq(method, urlString, client, cfg)
+		HTTPReq(method, urlString, state.BurpClient, cfg)
 	}
 
 	//check we care about it (body only) section

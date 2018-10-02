@@ -10,7 +10,7 @@ import (
 )
 
 //ManageRequests handles the request workers
-func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages, confirmed chan SpiderPage, workers chan struct{}, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
+func ManageRequests(cfg *Config, state *State, wg *sync.WaitGroup, pages, newPages, confirmed chan SpiderPage, workers chan struct{}, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
 	//manages net request workers
 	for {
 		page := <-pages
@@ -38,7 +38,7 @@ func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages
 }
 
 //ManageNewURLs will take in any URL, and decide if it should be added to the queue for bustin', or if we discovered something new
-func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages chan SpiderPage, printChan chan OutLine) {
+func ManageNewURLs(cfg *Config, state *State, wg *sync.WaitGroup, pages, newpages chan SpiderPage, printChan chan OutLine) {
 	//decides on whether to add to the directory list, or add to file output
 	checked := make(map[string]bool)
 	//	preCheck := make(map[string]bool)
@@ -107,7 +107,7 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 	}
 }
 
-func testURL(cfg Config, state State, wg *sync.WaitGroup, method string, urlString string, client *http.Client,
+func testURL(cfg *Config, state *State, wg *sync.WaitGroup, method string, urlString string, client *http.Client,
 	newPages chan SpiderPage, workers chan struct{},
 	confirmedGood chan SpiderPage, printChan chan OutLine, testChan chan string) {
 	defer func() {
@@ -157,7 +157,7 @@ func testURL(cfg Config, state State, wg *sync.WaitGroup, method string, urlStri
 	}
 }
 
-func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, workers chan struct{}, pages, newPages, confirmed chan SpiderPage, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
+func dirBust(cfg *Config, state *State, page SpiderPage, wg *sync.WaitGroup, workers chan struct{}, pages, newPages, confirmed chan SpiderPage, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
 	defer wg.Done()
 
 	//ugh
