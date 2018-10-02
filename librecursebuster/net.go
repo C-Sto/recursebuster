@@ -14,6 +14,7 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+//ConfigureHTTPClient configures and returns a HTTP Client (mostly useful to be able to send to burp)
 func ConfigureHTTPClient(cfg Config, wg *sync.WaitGroup, printChan chan OutLine, sendToBurpOnly bool) *http.Client {
 
 	httpTransport := &http.Transport{MaxIdleConns: 100}
@@ -30,11 +31,11 @@ func ConfigureHTTPClient(cfg Config, wg *sync.WaitGroup, printChan chan OutLine,
 	if (cfg.ProxyAddr != "" && !cfg.BurpMode) || //proxy is configured, and burpmode is disabled
 		(cfg.ProxyAddr != "" && cfg.BurpMode && sendToBurpOnly) { // proxy configured, in burpmode, and at the stage where we want to actually send it to burp
 		if strings.HasPrefix(cfg.ProxyAddr, "http") {
-			proxyUrl, err := url.Parse(cfg.ProxyAddr)
+			proxyURL, err := url.Parse(cfg.ProxyAddr)
 			if err != nil {
 				fmt.Println(err)
 			}
-			httpTransport.Proxy = http.ProxyURL(proxyUrl)
+			httpTransport.Proxy = http.ProxyURL(proxyURL)
 
 		} else {
 
@@ -53,7 +54,9 @@ func ConfigureHTTPClient(cfg Config, wg *sync.WaitGroup, printChan chan OutLine,
 	return client
 }
 
-func HttpReq(method, path string, client *http.Client, cfg Config) (*http.Response, []byte, error) {
+//HTTPReq sends the HTTP request based on the given settings, returns the response and the body
+//todo: This can probably be optimized to exit once the head has been retreived and discard the body
+func HTTPReq(method, path string, client *http.Client, cfg Config) (*http.Response, []byte, error) {
 	req, err := http.NewRequest(method, path, nil)
 
 	if err != nil {
@@ -94,7 +97,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 
 	//optimize GET requests by sending a head first (it's cheaper)
 	if method == "GET" && !cfg.NoHead {
-		headResp, _, err := HttpReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
+		headResp, _, err := HTTPReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
 		if err != nil {
 			success = false
 			<-workers //done with the net thread
@@ -114,14 +117,14 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 			if cfg.BurpMode { //send successful request again... twice as many requests, but less burp spam
 
 				client = ConfigureHTTPClient(cfg, wg, printChan, true)
-				HttpReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
+				HTTPReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
 			}
 			<-workers
 			return headResp, content, success
 		}
 	}
 
-	headResp, content, err := HttpReq(method, urlString, client, cfg)
+	headResp, content, err := HTTPReq(method, urlString, client, cfg)
 	<-workers //done with the net thread
 	if err != nil {
 		success = false
@@ -149,7 +152,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 	//get content from validated path/file thing
 	if cfg.BurpMode {
 		client = ConfigureHTTPClient(cfg, wg, printChan, true)
-		HttpReq(method, urlString, client, cfg)
+		HTTPReq(method, urlString, client, cfg)
 	}
 
 	//check we care about it (body only) section
@@ -167,6 +170,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg Config, state State, method string, url
 	return headResp, content, true
 }
 
+//RedirectHandler dictates the way to handle redirects.
 func RedirectHandler(req *http.Request, via []*http.Request) error {
 	return http.ErrUseLastResponse
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/pmezard/go-difflib/difflib"
 )
 
+//RandString will return a UUID
 func RandString(printChan chan OutLine) string {
 	b := make([]byte, 16)
 	_, err := rand.Read(b)

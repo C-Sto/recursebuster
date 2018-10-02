@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 )
 
+//ManageRequests handles the request workers
 func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages, confirmed chan SpiderPage, workers chan struct{}, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
 	//manages net request workers
 	for {
@@ -37,6 +38,7 @@ func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages
 	}
 }
 
+//ManageNewURLs will take in any URL, and decide if it should be added to the queue for bustin', or if we discovered something new
 func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages chan SpiderPage, printChan chan OutLine) {
 	//decides on whether to add to the directory list, or add to file output
 	checked := make(map[string]bool)
