@@ -12,6 +12,8 @@ Ye olde go get install should work. Same command to update:
 go get -u github.com/c-sto/recursebuster
 ```
 
+Important releases will also be tagged and uploaded.
+
 ## Usage
 
 I wanted it to be fairly straightforward, but scope creep etc. Basic usage is just like gobuster:

@@ -195,7 +195,7 @@ func main() {
 
 		readerChan := make(chan string, 100)
 		go librecursebuster.LoadWords(cfg.Wordlist, readerChan, printChan)
-		for _ = range readerChan {
+		for range readerChan {
 			atomic.AddUint32(globalState.WordlistLen, 1)
 		}
 	}
