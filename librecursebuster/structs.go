@@ -129,6 +129,7 @@ func (hs *HostStates) AddSoft404Content(host string, content []byte) {
 	hs.hosts[host] = HostState{ParsedURL: hs.hosts[host].ParsedURL, Soft404ResponseBody: content}
 }
 
+//Get404Body returns the stored 'not found' body
 func (hs *HostStates) Get404Body(host string) []byte {
 	hs.mu.RLock()
 	defer hs.mu.RUnlock()
