@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -42,16 +41,18 @@ func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages
 func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages chan SpiderPage, printChan chan OutLine) {
 	//decides on whether to add to the directory list, or add to file output
 	checked := make(map[string]bool)
-	preCheck := make(map[string]bool)
+	//	preCheck := make(map[string]bool)
 	for {
 		candidate := <-newpages
 
-		//shortcut (will make checked much bigger than it should be, but will save cycles)
+		/*//shortcut (will make checked much bigger than it should be, but will save cycles)
+		//removed due to stupid memory soaking issue
 		if _, ok := preCheck[candidate.URL]; ok {
 			wg.Done()
 			continue
 		}
 		preCheck[candidate.URL] = true
+		*/
 
 		//check the candidate is an actual URL
 		u, err := url.Parse(strings.TrimSpace(candidate.URL))
@@ -65,34 +66,10 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 		//links of the form <a href="/thing" ></a> don't have a host portion to the URL
 		if len(u.Host) == 0 {
 			u.Host = candidate.Reference.Host
-			//u.Host = state.ParsedURL.Host
 		}
 
 		//actualUrl := state.ParsedURL.Scheme + "://" + u.Host
-		actualURL := (*candidate.Reference).Scheme + "://" + u.Host
-
-		//path.Clean removes trailing /, so we need to add it in again after cleaning (removing dots etc) :rolling eyes emoji:
-		var didHaveSlash bool
-		if len(u.Path) > 0 {
-			didHaveSlash = string(u.Path[len(u.Path)-1]) == "/"
-		}
-
-		if len(u.Path) > 0 && string(u.Path[0]) != "/" {
-			u.Path = "/" + u.Path
-		}
-
-		cleaned := path.Clean(u.Path)
-
-		if string(cleaned[0]) != "/" {
-			cleaned = "/" + cleaned
-		}
-		if cleaned != "." {
-			actualURL += cleaned
-
-		}
-		if didHaveSlash && cleaned != "/" {
-			actualURL += "/"
-		}
+		actualURL := cleanURL(u, (*candidate.Reference).Scheme+"://"+u.Host)
 
 		if _, ok := checked[actualURL]; !ok && //must have not checked it before
 			(state.Hosts.HostExists(u.Host) || state.Whitelist[u.Host]) && //must be within whitelist, or be one of the starting urls

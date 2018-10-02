@@ -75,22 +75,25 @@ func OutputWriter(wg *sync.WaitGroup, cfg Config, confirmed chan SpiderPage, loc
 			}
 			file.WriteString(writeS + "\n")
 			file.Sync()
-			//ugh
-			x := object.Result.StatusCode
-			if 199 < x && x < 300 { //2xx
-				PrintOutput(printS, Good2, 0, wg, printChan)
-			} else if 299 < x && x < 400 { //3xx
-				PrintOutput(printS, Good3, 0, wg, printChan)
-			} else if 399 < x && x < 500 { //4xx
-				PrintOutput(printS, Good4, 0, wg, printChan)
-			} else if 499 < x && x < 600 { //5xx
-				PrintOutput(printS, Good5, 0, wg, printChan)
-			} else {
-				PrintOutput(printS, Goodx, 0, wg, printChan)
-			}
 
+			printBasedOnStatus(object.Result.StatusCode, printS, wg, printChan)
 		}
 		wg.Done()
+	}
+}
+
+func printBasedOnStatus(status int, printS string, wg *sync.WaitGroup, printChan chan OutLine) {
+	x := status
+	if 199 < x && x < 300 { //2xx
+		PrintOutput(printS, Good2, 0, wg, printChan)
+	} else if 299 < x && x < 400 { //3xx
+		PrintOutput(printS, Good3, 0, wg, printChan)
+	} else if 399 < x && x < 500 { //4xx
+		PrintOutput(printS, Good4, 0, wg, printChan)
+	} else if 499 < x && x < 600 { //5xx
+		PrintOutput(printS, Good5, 0, wg, printChan)
+	} else {
+		PrintOutput(printS, Goodx, 0, wg, printChan)
 	}
 }
 
