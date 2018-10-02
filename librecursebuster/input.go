@@ -5,6 +5,8 @@ import (
 	"os"
 )
 
+//LoadWords asynchronously loads in words to a channel.
+//Expects the channel to either be big enough to load the whole file, or that it will be streamed from as the file is opened and read from.
 func LoadWords(filePath string, destChan chan string, printChan chan OutLine) {
 	defer close(destChan)
 	//get words from local file

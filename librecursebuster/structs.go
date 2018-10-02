@@ -214,7 +214,6 @@ func (i *ArrayStringFlag) Get() []string {
 //SpiderPage represents a 'working' page object, represented by an URL and it's (optional)result.
 type SpiderPage struct {
 	URL       string
-	method    string
 	Result    *http.Response
 	Reference *url.URL //where did we get this URL from? (for the logic portion)
 }
