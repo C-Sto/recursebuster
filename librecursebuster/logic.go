@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 	"sync"
 	"sync/atomic"
 )
 
-func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages, confirmed chan SpiderPage, workers chan struct{}, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
+//ManageRequests handles the request workers
+func ManageRequests(cfg *Config, state *State, wg *sync.WaitGroup, pages, newPages, confirmed chan SpiderPage, workers chan struct{}, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
 	//manages net request workers
 	for {
 		page := <-pages
@@ -37,19 +37,22 @@ func ManageRequests(cfg Config, state State, wg *sync.WaitGroup, pages, newPages
 	}
 }
 
-func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages chan SpiderPage, printChan chan OutLine) {
+//ManageNewURLs will take in any URL, and decide if it should be added to the queue for bustin', or if we discovered something new
+func ManageNewURLs(cfg *Config, state *State, wg *sync.WaitGroup, pages, newpages chan SpiderPage, printChan chan OutLine) {
 	//decides on whether to add to the directory list, or add to file output
 	checked := make(map[string]bool)
-	preCheck := make(map[string]bool)
+	//	preCheck := make(map[string]bool)
 	for {
 		candidate := <-newpages
 
-		//shortcut (will make checked much bigger than it should be, but will save cycles)
+		/*//shortcut (will make checked much bigger than it should be, but will save cycles)
+		//removed due to stupid memory soaking issue
 		if _, ok := preCheck[candidate.URL]; ok {
 			wg.Done()
 			continue
 		}
 		preCheck[candidate.URL] = true
+		*/
 
 		//check the candidate is an actual URL
 		u, err := url.Parse(strings.TrimSpace(candidate.URL))
@@ -63,34 +66,10 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 		//links of the form <a href="/thing" ></a> don't have a host portion to the URL
 		if len(u.Host) == 0 {
 			u.Host = candidate.Reference.Host
-			//u.Host = state.ParsedURL.Host
 		}
 
 		//actualUrl := state.ParsedURL.Scheme + "://" + u.Host
-		actualURL := (*candidate.Reference).Scheme + "://" + u.Host
-
-		//path.Clean removes trailing /, so we need to add it in again after cleaning (removing dots etc) :rolling eyes emoji:
-		var didHaveSlash bool
-		if len(u.Path) > 0 {
-			didHaveSlash = string(u.Path[len(u.Path)-1]) == "/"
-		}
-
-		if len(u.Path) > 0 && string(u.Path[0]) != "/" {
-			u.Path = "/" + u.Path
-		}
-
-		cleaned := path.Clean(u.Path)
-
-		if string(cleaned[0]) != "/" {
-			cleaned = "/" + cleaned
-		}
-		if cleaned != "." {
-			actualURL += cleaned
-
-		}
-		if didHaveSlash && cleaned != "/" {
-			actualURL += "/"
-		}
+		actualURL := cleanURL(u, (*candidate.Reference).Scheme+"://"+u.Host)
 
 		if _, ok := checked[actualURL]; !ok && //must have not checked it before
 			(state.Hosts.HostExists(u.Host) || state.Whitelist[u.Host]) && //must be within whitelist, or be one of the starting urls
@@ -128,7 +107,7 @@ func ManageNewURLs(cfg Config, state State, wg *sync.WaitGroup, pages, newpages 
 	}
 }
 
-func testURL(cfg Config, state State, wg *sync.WaitGroup, method string, urlString string, client *http.Client,
+func testURL(cfg *Config, state *State, wg *sync.WaitGroup, method string, urlString string, client *http.Client,
 	newPages chan SpiderPage, workers chan struct{},
 	confirmedGood chan SpiderPage, printChan chan OutLine, testChan chan string) {
 	defer func() {
@@ -178,7 +157,7 @@ func testURL(cfg Config, state State, wg *sync.WaitGroup, method string, urlStri
 	}
 }
 
-func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, workers chan struct{}, pages, newPages, confirmed chan SpiderPage, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
+func dirBust(cfg *Config, state *State, page SpiderPage, wg *sync.WaitGroup, workers chan struct{}, pages, newPages, confirmed chan SpiderPage, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
 	defer wg.Done()
 
 	//ugh
@@ -197,7 +176,7 @@ func dirBust(cfg Config, state State, page SpiderPage, wg *sync.WaitGroup, worke
 				//it's a soft404 probably, guess we can continue (this logic seems wrong??)
 			} else {
 				PrintOutput(
-					fmt.Sprintf("Wildcard repsonse detected, skipping dirbusting of %s", page.URL),
+					fmt.Sprintf("Wildcard response detected, skipping dirbusting of %s", page.URL),
 					Info, 0, wg, printChan)
 				return
 			}

@@ -87,6 +87,7 @@ type State struct {
 
 	//global State values
 	Client         *http.Client
+	BurpClient     *http.Client
 	TotalTested    *uint64
 	PerSecondShort *uint64 //how many tested over 2 seconds or so
 	PerSecondLong  *uint64
@@ -132,6 +133,7 @@ func (hs *HostStates) AddSoft404Content(host string, content []byte) {
 	hs.hosts[host] = HostState{ParsedURL: hs.hosts[host].ParsedURL, Soft404ResponseBody: content}
 }
 
+//Get404Body returns the stored known-not-good body from a response
 func (hs *HostStates) Get404Body(host string) []byte {
 	hs.mu.RLock()
 	defer hs.mu.RUnlock()
@@ -187,6 +189,7 @@ type Config struct {
 	Ratio404          float64
 	ShowAll           bool
 	ShowLen           bool
+	ShowVersion       bool
 	SSLIgnore         bool
 	Threads           int
 	Timeout           int
@@ -218,7 +221,6 @@ func (i *ArrayStringFlag) Get() []string {
 //SpiderPage represents a 'working' page object, represented by an URL and it's (optional)result.
 type SpiderPage struct {
 	URL       string
-	method    string
 	Result    *http.Response
 	Reference *url.URL //where did we get this URL from? (for the logic portion)
 }

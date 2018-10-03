@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	"net/url"
+	"path"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/pmezard/go-difflib/difflib"
 )
 
+//RandString will return a UUID
 func RandString(printChan chan OutLine) string {
 	b := make([]byte, 16)
 	_, err := rand.Read(b)
@@ -49,4 +52,28 @@ func detectSoft404(a []byte, b []byte, ratio float64) bool {
 		return true
 	}
 	return false
+}
+
+func cleanURL(u *url.URL, actualURL string) string {
+	var didHaveSlash bool
+	if len(u.Path) > 0 {
+		didHaveSlash = string(u.Path[len(u.Path)-1]) == "/"
+		if string(u.Path[0]) != "/" {
+			u.Path = "/" + u.Path
+		}
+	}
+
+	cleaned := path.Clean(u.Path)
+
+	if string(cleaned[0]) != "/" {
+		cleaned = "/" + cleaned
+	}
+	if cleaned != "." {
+		actualURL += cleaned
+	}
+
+	if didHaveSlash && cleaned != "/" {
+		actualURL += "/"
+	}
+	return actualURL
 }

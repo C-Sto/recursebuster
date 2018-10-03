@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-func PrintBanner(cfg Config) {
+//PrintBanner prints the banner and in debug mode will also print all set options
+func PrintBanner(cfg *Config) {
 	//todo: include settings in banner
 	fmt.Println(strings.Repeat("=", 20))
 	fmt.Println("recursebuster V" + cfg.Version)
@@ -24,7 +25,7 @@ func PrintBanner(cfg Config) {
 }
 
 //stolen from swarlz
-func printOpts(s Config) {
+func printOpts(s *Config) {
 	keys := reflect.ValueOf(&s).Elem()
 	typeOfT := keys.Type()
 	for i := 0; i < keys.NumField(); i++ {
@@ -34,7 +35,8 @@ func printOpts(s Config) {
 
 }
 
-func OutputWriter(wg *sync.WaitGroup, cfg Config, confirmed chan SpiderPage, localPath string, printChan chan OutLine) {
+//OutputWriter will write to a file and the screen
+func OutputWriter(wg *sync.WaitGroup, cfg *Config, confirmed chan SpiderPage, localPath string, printChan chan OutLine) {
 	//output worker
 	pages := make(map[string]bool) //keep it unique
 	file, err := os.OpenFile(localPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
@@ -73,25 +75,29 @@ func OutputWriter(wg *sync.WaitGroup, cfg Config, confirmed chan SpiderPage, loc
 			}
 			file.WriteString(writeS + "\n")
 			file.Sync()
-			//ugh
-			x := object.Result.StatusCode
-			if 199 < x && x < 300 { //2xx
-				PrintOutput(printS, Good2, 0, wg, printChan)
-			} else if 299 < x && x < 400 { //3xx
-				PrintOutput(printS, Good3, 0, wg, printChan)
-			} else if 399 < x && x < 500 { //4xx
-				PrintOutput(printS, Good4, 0, wg, printChan)
-			} else if 499 < x && x < 600 { //5xx
-				PrintOutput(printS, Good5, 0, wg, printChan)
-			} else {
-				PrintOutput(printS, Goodx, 0, wg, printChan)
-			}
 
+			printBasedOnStatus(object.Result.StatusCode, printS, wg, printChan)
 		}
 		wg.Done()
 	}
 }
 
+func printBasedOnStatus(status int, printS string, wg *sync.WaitGroup, printChan chan OutLine) {
+	x := status
+	if 199 < x && x < 300 { //2xx
+		PrintOutput(printS, Good2, 0, wg, printChan)
+	} else if 299 < x && x < 400 { //3xx
+		PrintOutput(printS, Good3, 0, wg, printChan)
+	} else if 399 < x && x < 500 { //4xx
+		PrintOutput(printS, Good4, 0, wg, printChan)
+	} else if 499 < x && x < 600 { //5xx
+		PrintOutput(printS, Good5, 0, wg, printChan)
+	} else {
+		PrintOutput(printS, Goodx, 0, wg, printChan)
+	}
+}
+
+//PrintOutput used to send output to the screen
 func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sync.WaitGroup, printChan chan OutLine) {
 	wg.Add(1)
 	printChan <- OutLine{
@@ -101,7 +107,8 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sy
 	}
 }
 
-func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
+//StatusPrinter is the function that performs all the status printing logic
+func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
 	tick := time.NewTicker(time.Second * 2)
 	status := getStatus(state)
 	spacesToClear := 0
@@ -149,7 +156,7 @@ func StatusPrinter(cfg Config, state State, wg *sync.WaitGroup, printChan chan O
 	}
 }
 
-func getStatus(s State) string {
+func getStatus(s *State) string {
 
 	return fmt.Sprintf("Tested: %d Speed(2s): %d/s Speed: %d/s",
 		atomic.LoadUint64(s.TotalTested),
@@ -158,11 +165,12 @@ func getStatus(s State) string {
 	)
 }
 
-func StatsTracker(state State) {
+//StatsTracker updates the stats every so often
+func StatsTracker(state *State) {
 	tick := time.NewTicker(time.Second * 2)
 	testedBefore := atomic.LoadUint64(state.TotalTested)
 	timeBefore := time.Now()
-	for _ = range tick.C {
+	for range tick.C {
 		testedNow := atomic.LoadUint64(state.TotalTested)
 
 		//calculate short average (tested since last tick)

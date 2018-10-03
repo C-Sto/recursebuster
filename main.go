@@ -19,7 +19,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.4.0"
+const version = "1.4.3"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -30,10 +30,10 @@ func main() {
 	}
 
 	wg := &sync.WaitGroup{}
-	cfg := librecursebuster.Config{}
+	cfg := &librecursebuster.Config{}
 
 	//the state should probably change per different host.. eventually
-	globalState := librecursebuster.State{
+	globalState := &librecursebuster.State{
 		BadResponses: make(map[int]bool),
 		Whitelist:    make(map[string]bool),
 		Blacklist:    make(map[string]bool),
@@ -43,7 +43,6 @@ func main() {
 	cfg.Version = version
 	totesTested := uint64(0)
 	globalState.TotalTested = &totesTested
-	showVersion := true
 	flag.BoolVar(&cfg.ShowAll, "all", false, "Show, and write the result of all checks")
 	flag.BoolVar(&cfg.AppendDir, "appendslash", false, "Append a / to all directory bruteforce requests (like extension, but slash instead of .yourthing)")
 	flag.StringVar(&cfg.Auth, "auth", "", "Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.")
@@ -81,70 +80,106 @@ func main() {
 	flag.StringVar(&cfg.URL, "u", "", "Url to spider")
 	flag.StringVar(&cfg.Agent, "ua", "RecurseBuster/"+version, "User agent to use when sending requests.")
 	flag.IntVar(&cfg.VerboseLevel, "v", 0, "Verbosity level for output messages.")
-	flag.BoolVar(&showVersion, "version", false, "Show version number and exit")
+	flag.BoolVar(&cfg.ShowVersion, "version", false, "Show version number and exit")
 	flag.StringVar(&cfg.Wordlist, "w", "", "Wordlist to use for bruteforce. Blank for spider only")
 	flag.StringVar(&cfg.WhitelistLocation, "whitelist", "", "Whitelist of domains to include in brute-force")
 
 	flag.Parse()
 
-	if cfg.Debug {
-		go func() {
-			http.ListenAndServe("localhost:6061", http.DefaultServeMux)
-		}()
-	}
-
-	if !cfg.NoUI {
-		wg.Add(1)
-		go globalState.StartUI()
-
-	}
-
-	if showVersion {
-		librecursebuster.PrintBanner(cfg)
-		os.Exit(0)
-	}
-
 	printChan := make(chan librecursebuster.OutLine, 200)
-	if cfg.URL == "" && cfg.InputList == "" {
-		flag.Usage()
-		os.Exit(1)
+
+	urlSlice := getURLSlice(cfg, printChan)
+
+	setupConfig(cfg, globalState, urlSlice[0], printChan)
+
+	setupState(globalState, cfg, wg, printChan)
+
+	//setup channels
+	pages := make(chan librecursebuster.SpiderPage, 1000)
+	newPages := make(chan librecursebuster.SpiderPage, 10000)
+	confirmed := make(chan librecursebuster.SpiderPage, 1000)
+	workers := make(chan struct{}, cfg.Threads)
+	maxDirs := make(chan struct{}, cfg.MaxDirs)
+	testChan := make(chan string, 100)
+
+	librecursebuster.PrintBanner(cfg)
+
+	//do first load of urls (send canary requests to make sure we can dirbust them)
+
+	globalState.StartTime = time.Now()
+	globalState.PerSecondShort = new(uint64)
+	globalState.PerSecondLong = new(uint64)
+
+	go librecursebuster.StatusPrinter(cfg, globalState, wg, printChan, testChan)
+	go librecursebuster.ManageRequests(cfg, globalState, wg, pages, newPages, confirmed, workers, printChan, maxDirs, testChan)
+	go librecursebuster.ManageNewURLs(cfg, globalState, wg, pages, newPages, printChan)
+	go librecursebuster.OutputWriter(wg, cfg, confirmed, cfg.Localpath, printChan)
+	go librecursebuster.StatsTracker(globalState)
+
+	librecursebuster.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0, wg, printChan)
+
+	//seed the workers
+	for _, s := range urlSlice {
+		u, err := url.Parse(s)
+		if err != nil {
+			panic(err)
+		}
+
+		if u.Scheme == "" {
+			if cfg.HTTPS {
+				u, err = url.Parse("https://" + s)
+			} else {
+				u, err = url.Parse("http://" + s)
+			}
+		}
+		if err != nil {
+			//this should never actually happen
+			panic(err)
+		}
+
+		//do canary etc
+
+		prefix := u.String()
+		if len(prefix) > 0 && string(prefix[len(prefix)-1]) != "/" {
+			prefix = prefix + "/"
+		}
+		randURL := fmt.Sprintf("%s%s", prefix, cfg.Canary)
+		wg.Add(1)
+		workers <- struct{}{}
+		go startBusting(wg, globalState, cfg, workers, printChan, pages, randURL, *u)
+
 	}
 
-	var h *url.URL
-	var err error
-	URLSlice := []string{} //
+	//wait for completion
+	wg.Wait()
+
+}
+
+func getURLSlice(cfg *librecursebuster.Config, printChan chan librecursebuster.OutLine) []string {
+	urlSlice := []string{}
 	if cfg.URL != "" {
-		URLSlice = append(URLSlice, cfg.URL)
+		urlSlice = append(urlSlice, cfg.URL)
 	}
+
 	if cfg.InputList != "" { //can have both -u flag and -iL flag
 		//must be using an input list
 		URLList := make(chan string, 10)
 		go librecursebuster.LoadWords(cfg.InputList, URLList, printChan)
 		for x := range URLList {
 			//ensure all urls will parse good
-			_, err = url.Parse(x)
+			_, err := url.Parse(x)
 			if err != nil {
 				panic("URL parse fail: " + err.Error())
 			}
-			URLSlice = append(URLSlice, x)
+			urlSlice = append(urlSlice, x)
 			//globalState.Whitelist[u.Host] = true
 		}
 	}
 
-	h, err = url.Parse(URLSlice[0])
+	return urlSlice
+}
 
-	if err != nil {
-		panic("URL parse fail")
-	}
-
-	if h.Scheme == "" {
-		if cfg.HTTPS {
-			h, err = url.Parse("https://" + URLSlice[0])
-		} else {
-			h, err = url.Parse("http://" + URLSlice[0])
-		}
-	}
-
+func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Config, wg *sync.WaitGroup, printChan chan librecursebuster.OutLine) {
 	for _, x := range strings.Split(cfg.Extensions, ",") {
 		globalState.Extensions = append(globalState.Extensions, x)
 	}
@@ -161,19 +196,8 @@ func main() {
 		globalState.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
 	}
 
-	globalState.Hosts.AddHost(h)
-	//state.ParsedURL = h
-	client := librecursebuster.ConfigureHTTPClient(cfg, wg, printChan, false)
-
-	//setup channels
-	pages := make(chan librecursebuster.SpiderPage, 1000)
-	newPages := make(chan librecursebuster.SpiderPage, 10000)
-	confirmed := make(chan librecursebuster.SpiderPage, 1000)
-	workers := make(chan struct{}, cfg.Threads)
-	maxDirs := make(chan struct{}, cfg.MaxDirs)
-	testChan := make(chan string, 100)
-
-	globalState.Client = client
+	globalState.Client = librecursebuster.ConfigureHTTPClient(cfg, wg, printChan, false)
+	globalState.BurpClient = librecursebuster.ConfigureHTTPClient(cfg, wg, printChan, true)
 
 	if cfg.BlacklistLocation != "" {
 		readerChan := make(chan string, 100)
@@ -201,102 +225,93 @@ func main() {
 
 		readerChan := make(chan string, 100)
 		go librecursebuster.LoadWords(cfg.Wordlist, readerChan, printChan)
-		for _ = range readerChan {
+		for range readerChan {
 			atomic.AddUint32(globalState.WordlistLen, 1)
 		}
 	}
+}
 
-	canary := librecursebuster.RandString(printChan)
-
-	if cfg.Canary != "" {
-		canary = cfg.Canary
-	}
-
-	librecursebuster.PrintBanner(cfg)
-
-	//do first load of urls (send canary requests to make sure we can dirbust them)
-
-	globalState.StartTime = time.Now()
-	globalState.PerSecondShort = new(uint64)
-	globalState.PerSecondLong = new(uint64)
-
-	go librecursebuster.StatusPrinter(cfg, globalState, wg, printChan, testChan)
-	go librecursebuster.ManageRequests(cfg, globalState, wg, pages, newPages, confirmed, workers, printChan, maxDirs, testChan)
-	go librecursebuster.ManageNewURLs(cfg, globalState, wg, pages, newPages, printChan)
-	go librecursebuster.OutputWriter(wg, cfg, confirmed, cfg.Localpath, printChan)
-	go librecursebuster.StatsTracker(globalState)
-
-	librecursebuster.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0, wg, printChan)
-
-	//seed the workers
-	for _, s := range URLSlice {
-		u, err := url.Parse(s)
-		if err != nil {
-			panic(err)
-		}
-
-		if u.Scheme == "" {
-			if cfg.HTTPS {
-				u, err = url.Parse("https://" + s)
-			} else {
-				u, err = url.Parse("http://" + s)
-			}
-		}
-
-		//do canary etc
-
-		prefix := u.String()
-		if len(prefix) > 0 && string(prefix[len(prefix)-1]) != "/" {
-			prefix = prefix + "/"
-		}
-		randURL := fmt.Sprintf("%s%s", prefix, canary)
-		workers <- struct{}{}
+func setupConfig(cfg *librecursebuster.Config, globalState *librecursebuster.State, urlSliceZero string, printChan chan librecursebuster.OutLine) {
+	if cfg.Debug {
 		go func() {
-			if !cfg.NoWildcardChecks {
-				resp, content, err := librecursebuster.HttpReq("GET", randURL, client, cfg)
-				<-workers
-				if err != nil {
-					if cfg.InputList != "" {
-						librecursebuster.PrintOutput(
-							err.Error(),
-							librecursebuster.Error,
-							0,
-							wg,
-							printChan,
-						)
-						return
-					}
-					panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
-
-				}
-				librecursebuster.PrintOutput(
-					fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
-					librecursebuster.Debug, 2, wg, printChan,
-				)
-
-				globalState.Hosts.AddSoft404Content(u.Host, content) // Soft404ResponseBody = xx
-			} else {
-				<-workers
-			}
-			x := librecursebuster.SpiderPage{}
-			x.URL = u.String()
-			x.Reference = u
-
-			if !strings.HasSuffix(u.String(), "/") {
-				wg.Add(1)
-				pages <- librecursebuster.SpiderPage{
-					URL:       u.String() + "/",
-					Reference: u,
-				}
-			}
-
-			wg.Add(1)
-			pages <- x
+			http.ListenAndServe("localhost:6061", http.DefaultServeMux)
 		}()
-
 	}
 
-	//wait for completion
-	wg.Wait()
+	if cfg.ShowVersion {
+		librecursebuster.PrintBanner(cfg)
+		os.Exit(0)
+	}
 
+	if cfg.URL == "" && cfg.InputList == "" {
+		flag.Usage()
+		os.Exit(1)
+	}
+	var h *url.URL
+	var err error
+	h, err = url.Parse(urlSliceZero)
+	if err != nil {
+		panic(err)
+	}
+
+	if h.Scheme == "" {
+		if cfg.HTTPS {
+			h, err = url.Parse("https://" + urlSliceZero)
+		} else {
+			h, err = url.Parse("http://" + urlSliceZero)
+		}
+	}
+	if err != nil {
+		panic(err)
+	}
+	globalState.Hosts.AddHost(h)
+
+	if cfg.Canary == "" {
+		cfg.Canary = librecursebuster.RandString(printChan)
+	}
+
+}
+
+func startBusting(wg *sync.WaitGroup, globalState *librecursebuster.State, cfg *librecursebuster.Config, workers chan struct{}, printChan chan librecursebuster.OutLine, pages chan librecursebuster.SpiderPage, randURL string, u url.URL) {
+	defer wg.Done()
+	if !cfg.NoWildcardChecks {
+		resp, content, err := librecursebuster.HTTPReq("GET", randURL, globalState.Client, cfg)
+		<-workers
+		if err != nil {
+			if cfg.InputList != "" {
+				librecursebuster.PrintOutput(
+					err.Error(),
+					librecursebuster.Error,
+					0,
+					wg,
+					printChan,
+				)
+				return
+			}
+			panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
+
+		}
+		librecursebuster.PrintOutput(
+			fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
+			librecursebuster.Debug, 2, wg, printChan,
+		)
+
+		globalState.Hosts.AddSoft404Content(u.Host, content) // Soft404ResponseBody = xx
+	} else {
+		<-workers
+	}
+	x := librecursebuster.SpiderPage{}
+	x.URL = u.String()
+	x.Reference = &u
+
+	if !strings.HasSuffix(u.String(), "/") {
+		wg.Add(1)
+		pages <- librecursebuster.SpiderPage{
+			URL:       u.String() + "/",
+			Reference: &u,
+		}
+	}
+
+	wg.Add(1)
+	pages <- x
 }
