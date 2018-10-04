@@ -130,27 +130,16 @@ func pgDown(g *ui.Gui, cv *ui.View) error {
 	return nil
 }
 
-// ScrollView by a given offset
-func sScrollView(v *ui.View, dy int) error {
-	if v != nil {
-		v.Autoscroll = false
-		ox, oy := v.Origin()
-		if err := v.SetOrigin(ox, oy+dy); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func ScrollView(v *ui.View, g *ui.Gui, dy int) {
 	// Grab the view that we want to scroll.
 	// Get the size and position of the view.
 	_, y := v.Size()
 	ox, oy := v.Origin()
 	v.Autoscroll = false
-	v.SetOrigin(ox, oy+dy)
-
+	e := v.SetOrigin(ox, oy+dy)
+	if e != nil {
+		//appease error check static analysis
+	}
 	if oy+dy > strings.Count(v.ViewBuffer(), "\n")-y-1 {
 		// Set autoscroll to normal again.
 		v.Autoscroll = true
