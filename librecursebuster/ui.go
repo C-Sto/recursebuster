@@ -138,6 +138,7 @@ func ScrollView(v *ui.View, g *ui.Gui, dy int) {
 	v.Autoscroll = false
 	e := v.SetOrigin(ox, oy+dy)
 	if e != nil {
+		return
 		//appease error check static analysis
 	}
 	if oy+dy > strings.Count(v.ViewBuffer(), "\n")-y-1 {
