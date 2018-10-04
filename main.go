@@ -94,6 +94,7 @@ func main() {
 	setupConfig(cfg, globalState, urlSlice[0], printChan)
 
 	setupState(globalState, cfg, wg, printChan)
+	librecursebuster.SetState(globalState)
 
 	//setup channels
 	pages := make(chan librecursebuster.SpiderPage, 1000)
@@ -102,6 +103,7 @@ func main() {
 	workers := make(chan struct{}, cfg.Threads)
 	maxDirs := make(chan struct{}, cfg.MaxDirs)
 	testChan := make(chan string, 100)
+	quitChan := make(chan struct{})
 
 	librecursebuster.PrintBanner(cfg)
 
@@ -110,10 +112,13 @@ func main() {
 	globalState.StartTime = time.Now()
 	globalState.PerSecondShort = new(uint64)
 	globalState.PerSecondLong = new(uint64)
-	uiWG := &sync.WaitGroup{}
-	uiWG.Add(1)
-	go globalState.StartUI(uiWG)
-	uiWG.Wait()
+	if !cfg.NoUI {
+		uiWG := &sync.WaitGroup{}
+		uiWG.Add(1)
+		go uiQuit(quitChan)
+		go globalState.StartUI(uiWG, quitChan)
+		uiWG.Wait()
+	}
 	if cfg.NoUI {
 		go librecursebuster.StatusPrinter(cfg, globalState, wg, printChan, testChan)
 	} else {
@@ -187,6 +192,11 @@ func getURLSlice(cfg *librecursebuster.Config, printChan chan librecursebuster.O
 	return urlSlice
 }
 
+func uiQuit(quitChan chan struct{}) {
+	<-quitChan
+	os.Exit(0)
+}
+
 func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Config, wg *sync.WaitGroup, printChan chan librecursebuster.OutLine) {
 	for _, x := range strings.Split(cfg.Extensions, ",") {
 		globalState.Extensions = append(globalState.Extensions, x)
@@ -206,6 +216,9 @@ func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Confi
 
 	globalState.Client = librecursebuster.ConfigureHTTPClient(cfg, wg, printChan, false)
 	globalState.BurpClient = librecursebuster.ConfigureHTTPClient(cfg, wg, printChan, true)
+
+	globalState.StopDir = make(chan struct{}, 1)
+	globalState.SdMut = &sync.Mutex{}
 
 	if cfg.BlacklistLocation != "" {
 		readerChan := make(chan string, 100)

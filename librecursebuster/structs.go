@@ -81,6 +81,12 @@ type OutLine struct {
 	Type    *ConsoleWriter
 }
 
+var gState *State
+
+func SetState(s *State) {
+	gState = s
+}
+
 //State represents the current state of the program. Options are not configured here, those are found in Config.
 type State struct {
 	//Should probably have different concepts between config and state. Configs that might change depending on the URL being queried
@@ -99,6 +105,9 @@ type State struct {
 	Methods        []string
 	WordlistLen    *uint32
 	DirbProgress   *uint32
+
+	StopDir chan struct{} //should probably have all teh chans in here
+	SdMut   *sync.Mutex
 
 	ui *gocui.Gui
 	//per host States

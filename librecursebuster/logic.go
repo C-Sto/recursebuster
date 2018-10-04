@@ -197,28 +197,41 @@ func dirBust(cfg *Config, state *State, page SpiderPage, wg *sync.WaitGroup, wor
 	if cfg.MaxDirs == 1 {
 		atomic.StoreUint32(state.DirbProgress, 0)
 	}
-	for word := range wordsChan { //will receive from the channel until it's closed
-		//read words off the channel, and test it
-		for _, method := range state.Methods {
 
-			if len(state.Extensions) > 0 && state.Extensions[0] != "" {
-				for _, ext := range state.Extensions {
+	wat := make(chan string, 1)
+
+	for wordout := range wordsChan { //will receive from the channel until it's closed
+		wat <- wordout
+		//read words off the channel, and test it OR close out because we wanna skip it
+		select {
+		case <-state.StopDir:
+			<-maxDirs
+			if !cfg.NoStartStop {
+				PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0, wg, printChan)
+			}
+			return
+		case word := <-wat:
+			for _, method := range state.Methods {
+
+				if len(state.Extensions) > 0 && state.Extensions[0] != "" {
+					for _, ext := range state.Extensions {
+						workers <- struct{}{}
+						wg.Add(1)
+						go testURL(cfg, state, wg, method, page.URL+word+"."+ext, state.Client, newPages, workers, confirmed, printChan, testChan)
+					}
+				}
+				if cfg.AppendDir {
 					workers <- struct{}{}
 					wg.Add(1)
-					go testURL(cfg, state, wg, method, page.URL+word+"."+ext, state.Client, newPages, workers, confirmed, printChan, testChan)
+					go testURL(cfg, state, wg, method, page.URL+word+"/", state.Client, newPages, workers, confirmed, printChan, testChan)
 				}
-			}
-			if cfg.AppendDir {
 				workers <- struct{}{}
 				wg.Add(1)
-				go testURL(cfg, state, wg, method, page.URL+word+"/", state.Client, newPages, workers, confirmed, printChan, testChan)
-			}
-			workers <- struct{}{}
-			wg.Add(1)
-			go testURL(cfg, state, wg, method, page.URL+word, state.Client, newPages, workers, confirmed, printChan, testChan)
+				go testURL(cfg, state, wg, method, page.URL+word, state.Client, newPages, workers, confirmed, printChan, testChan)
 
-			if cfg.MaxDirs == 1 {
-				atomic.AddUint32(state.DirbProgress, 1)
+				if cfg.MaxDirs == 1 {
+					atomic.AddUint32(state.DirbProgress, 1)
+				}
 			}
 		}
 	}

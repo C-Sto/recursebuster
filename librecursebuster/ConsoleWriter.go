@@ -17,7 +17,6 @@ type ConsoleWriter struct {
 }
 
 //This is super stupid, I should use a lib for this
-
 func (c *ConsoleWriter) formatHeader(buf *[]byte, t time.Time, file string, line int) {
 	*buf = append(*buf, c.prefix...)
 	year, month, day := t.Date()
@@ -59,6 +58,10 @@ func itoa(buf *[]byte, i int, wid int) {
 func (ConsoleWriter) New(w io.Writer, prefix string) *ConsoleWriter {
 	m := &sync.Mutex{}
 	return &ConsoleWriter{out: w, prefix: prefix, flag: 0, mu: m}
+}
+
+func (c ConsoleWriter) GetPrefix() string {
+	return c.prefix
 }
 
 // Output writes the output for an event. The string s contains

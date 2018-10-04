@@ -118,7 +118,7 @@ func UIPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan Out
 			//something to print
 			//v.Write([]byte(o.Content + "\n"))
 			if cfg.VerboseLevel >= o.Level {
-				addToMainUI(state, o.Content)
+				addToMainUI(state, o)
 			}
 			//state.ui.Update()
 			//fmt.Fprintln(v, o.Content+"\n")
@@ -134,29 +134,13 @@ func UIPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan Out
 	}
 }
 
-func addToMainUI(state *State, s string) {
+func addToMainUI(state *State, o OutLine) { //s string) {
 	state.ui.Update(func(g *gocui.Gui) error {
 		v, err := g.View("Main")
 		if err != nil {
 			return err
-			// handle error
 		}
-		//remove from top line if more lines than view height
-		_, y := v.Size()
-		if len(v.ViewBufferLines()) > y {
-			newWrite := v.ViewBufferLines()[1:] //pop off last element, and append new line
-			newWrite = append(newWrite, s)
-			v.Clear()
-			//fmt.Fprint(v, newWrite)
-			for _, line := range newWrite {
-				if line == "" {
-					continue
-				}
-				fmt.Fprintln(v, strings.Trim(line, "\n"))
-			}
-		} else {
-			fmt.Fprintln(v, s)
-		}
+		fmt.Fprintln(v, o.Type.GetPrefix()+o.Content)
 		return nil
 	})
 }
@@ -172,6 +156,8 @@ func writeStatus(state *State, s string) {
 		fmt.Fprintln(v, getStatus(state))
 		sprint := fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(state.DirbProgress))/float64(atomic.LoadUint32(state.WordlistLen)), s)
 		fmt.Fprintln(v, sprint)
+		fmt.Fprintln(v, "ctrl + [(c) quit, (x) stop current dir")
+		fmt.Fprintln(v, time.Now().String())
 		return nil
 	})
 }
@@ -215,9 +201,9 @@ func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan
 			testedURL = t
 		}
 
-		if !cfg.NoStatus {
+		if !cfg.NoStatus && cfg.NoUI {
 			//assemble the status string
-			sprint := fmt.Sprintf("%s"+black.Sprintf(">"), status)
+			sprint := fmt.Sprintf("%s"+black.Sprint(">"), status)
 			if cfg.MaxDirs == 1 && cfg.Wordlist != "" {
 				//this is the grossest format string I ever did see
 				sprint += fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(state.DirbProgress))/float64(atomic.LoadUint32(state.WordlistLen)), testedURL)
@@ -226,14 +212,14 @@ func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan
 			}
 
 			//flush the line
-			//fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
+			fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
 
-			//Status.Printf(sprint + "\r")
-			v, err := state.ui.View("Main")
-			if err != nil {
-				panic(err)
-			}
-			fmt.Fprintln(v, sprint+"\n")
+			Status.Printf(sprint + "\r")
+			/*		v, err := state.ui.View("Main")
+					if err != nil {
+						panic(err)
+					}
+					fmt.Fprintln(v, sprint+"\n")*/
 			//remember how many spaces we need to use to clear the line (21 for the date and time prefix)
 			spacesToClear = len(sprint) + 21
 		}
