@@ -19,7 +19,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.4.3"
+const version = "BETTER_UI 1.5.x"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
