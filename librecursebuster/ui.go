@@ -52,7 +52,7 @@ func (s *State) StartUI(wg *sync.WaitGroup, quitChan chan struct{}) {
 func handleX(g *ui.Gui, v *ui.View) error {
 	//vi, _ := g.View("Main")
 	//close(gState.StopDir)
-	select {
+	select { //lol dope hack to stop it blocking
 	case gState.StopDir <- struct{}{}:
 	default:
 	}

@@ -79,6 +79,7 @@ func ManageNewURLs(cfg *Config, state *State, wg *sync.WaitGroup, pages, newpage
 
 			wg.Add(1)
 			pages <- SpiderPage{URL: actualURL, Reference: candidate.Reference}
+			PrintOutput("URL Added: "+actualURL, Debug, 3, wg, printChan)
 
 			//also add any directories in the supplied path to the 'to be hacked' queue
 			path := ""
@@ -98,8 +99,12 @@ func ManageNewURLs(cfg *Config, state *State, wg *sync.WaitGroup, pages, newpage
 				newPage := SpiderPage{}
 				newPage.URL = newDir
 				newPage.Reference = candidate.Reference
+				if checked[actualURL] {
+					continue
+				}
 				wg.Add(1)
 				newpages <- newPage
+				PrintOutput("URL Added: "+actualURL, Debug, 3, wg, printChan)
 			}
 		}
 
@@ -198,10 +203,7 @@ func dirBust(cfg *Config, state *State, page SpiderPage, wg *sync.WaitGroup, wor
 		atomic.StoreUint32(state.DirbProgress, 0)
 	}
 
-	wat := make(chan string, 1)
-
-	for wordout := range wordsChan { //will receive from the channel until it's closed
-		wat <- wordout
+	for word := range wordsChan { //will receive from the channel until it's closed
 		//read words off the channel, and test it OR close out because we wanna skip it
 		select {
 		case <-state.StopDir:
@@ -210,7 +212,7 @@ func dirBust(cfg *Config, state *State, page SpiderPage, wg *sync.WaitGroup, wor
 				PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0, wg, printChan)
 			}
 			return
-		case word := <-wat:
+		default:
 			for _, method := range state.Methods {
 
 				if len(state.Extensions) > 0 && state.Extensions[0] != "" {
