@@ -107,13 +107,16 @@ type State struct {
 	DirbProgress   *uint32
 
 	StopDir chan struct{} //should probably have all teh chans in here
-	SdMut   *sync.Mutex
+
+	Checked map[string]bool
+	CMut    *sync.RWMutex
 
 	ui *gocui.Gui
 	//per host States
 	Hosts HostStates
 	//ParsedURL           *url.URL
 	//Soft404ResponseBody []byte
+	Version string
 }
 
 //HostStates represents the interface to the Host States..? (all this smells of bad hacks)

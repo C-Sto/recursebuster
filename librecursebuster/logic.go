@@ -40,19 +40,8 @@ func ManageRequests(cfg *Config, state *State, wg *sync.WaitGroup, pages, newPag
 //ManageNewURLs will take in any URL, and decide if it should be added to the queue for bustin', or if we discovered something new
 func ManageNewURLs(cfg *Config, state *State, wg *sync.WaitGroup, pages, newpages chan SpiderPage, printChan chan OutLine) {
 	//decides on whether to add to the directory list, or add to file output
-	checked := make(map[string]bool)
-	//	preCheck := make(map[string]bool)
 	for {
 		candidate := <-newpages
-
-		/*//shortcut (will make checked much bigger than it should be, but will save cycles)
-		//removed due to stupid memory soaking issue
-		if _, ok := preCheck[candidate.URL]; ok {
-			wg.Done()
-			continue
-		}
-		preCheck[candidate.URL] = true
-		*/
 
 		//check the candidate is an actual URL
 		u, err := url.Parse(strings.TrimSpace(candidate.URL))
@@ -71,12 +60,12 @@ func ManageNewURLs(cfg *Config, state *State, wg *sync.WaitGroup, pages, newpage
 		//actualUrl := state.ParsedURL.Scheme + "://" + u.Host
 		actualURL := cleanURL(u, (*candidate.Reference).Scheme+"://"+u.Host)
 
-		if _, ok := checked[actualURL]; !ok && //must have not checked it before
+		state.CMut.Lock()
+		if _, ok := state.Checked[actualURL]; !ok && //must have not checked it before
 			(state.Hosts.HostExists(u.Host) || state.Whitelist[u.Host]) && //must be within whitelist, or be one of the starting urls
 			!cfg.NoRecursion { //no recursion means we don't care about adding extra paths or content
-
-			checked[actualURL] = true
-
+			state.Checked[actualURL] = true
+			state.CMut.Unlock()
 			wg.Add(1)
 			pages <- SpiderPage{URL: actualURL, Reference: candidate.Reference}
 			PrintOutput("URL Added: "+actualURL, Debug, 3, wg, printChan)
@@ -99,13 +88,17 @@ func ManageNewURLs(cfg *Config, state *State, wg *sync.WaitGroup, pages, newpage
 				newPage := SpiderPage{}
 				newPage.URL = newDir
 				newPage.Reference = candidate.Reference
-				if checked[actualURL] {
+				state.CMut.RLock()
+				if state.Checked[newDir] {
+					state.CMut.RUnlock()
 					continue
 				}
+				state.CMut.RUnlock()
 				wg.Add(1)
 				newpages <- newPage
-				PrintOutput("URL Added: "+actualURL, Debug, 3, wg, printChan)
 			}
+		} else {
+			state.CMut.Unlock()
 		}
 
 		wg.Done()

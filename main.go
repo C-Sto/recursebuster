@@ -19,7 +19,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "BETTER_UI 1.5.x"
+const version = "BETTER_UI 1.5.xxxx"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -105,8 +105,6 @@ func main() {
 	testChan := make(chan string, 100)
 	quitChan := make(chan struct{})
 
-	librecursebuster.PrintBanner(cfg)
-
 	//do first load of urls (send canary requests to make sure we can dirbust them)
 
 	globalState.StartTime = time.Now()
@@ -119,6 +117,7 @@ func main() {
 		go globalState.StartUI(uiWG, quitChan)
 		uiWG.Wait()
 	}
+	librecursebuster.PrintBanner(cfg)
 	if cfg.NoUI {
 		go librecursebuster.StatusPrinter(cfg, globalState, wg, printChan, testChan)
 	} else {
@@ -218,7 +217,9 @@ func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Confi
 	globalState.BurpClient = librecursebuster.ConfigureHTTPClient(cfg, wg, printChan, true)
 
 	globalState.StopDir = make(chan struct{}, 1)
-	globalState.SdMut = &sync.Mutex{}
+	globalState.CMut = &sync.RWMutex{}
+	globalState.Checked = make(map[string]bool)
+	globalState.Version = cfg.Version
 
 	if cfg.BlacklistLocation != "" {
 		readerChan := make(chan string, 100)
@@ -325,14 +326,21 @@ func startBusting(wg *sync.WaitGroup, globalState *librecursebuster.State, cfg *
 	x.URL = u.String()
 	x.Reference = &u
 
-	if !strings.HasSuffix(u.String(), "/") {
+	globalState.CMut.Lock()
+	defer globalState.CMut.Unlock()
+	if ok := globalState.Checked[u.String()+"/"]; !strings.HasSuffix(u.String(), "/") && !ok {
 		wg.Add(1)
 		pages <- librecursebuster.SpiderPage{
 			URL:       u.String() + "/",
 			Reference: &u,
 		}
+		globalState.Checked[u.String()+"/"] = true
+		librecursebuster.PrintOutput("URL Added: "+u.String()+"/", librecursebuster.Debug, 3, wg, printChan)
 	}
-
-	wg.Add(1)
-	pages <- x
+	if ok := globalState.Checked[x.URL]; !ok {
+		wg.Add(1)
+		pages <- x
+		globalState.Checked[x.URL] = true
+		librecursebuster.PrintOutput("URL Added: "+x.URL, librecursebuster.Debug, 3, wg, printChan)
+	}
 }

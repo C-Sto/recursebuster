@@ -15,14 +15,16 @@ import (
 //PrintBanner prints the banner and in debug mode will also print all set options
 func PrintBanner(cfg *Config) {
 	//todo: include settings in banner
-	fmt.Println(strings.Repeat("=", 20))
-	fmt.Println("recursebuster V" + cfg.Version)
-	fmt.Println("Poorly hacked together by C_Sto (@C__Sto)")
-	fmt.Println("Heavy influence from Gograbber, thx Swarlz")
-	fmt.Println(strings.Repeat("=", 20))
-	if cfg.Debug {
-		printOpts(cfg)
+	if cfg.NoUI {
 		fmt.Println(strings.Repeat("=", 20))
+		fmt.Println("recursebuster V" + cfg.Version)
+		fmt.Println("Poorly hacked together by C_Sto (@C__Sto)")
+		fmt.Println("Heavy influence from Gograbber, thx Swarlz")
+		fmt.Println(strings.Repeat("=", 20))
+		if cfg.Debug {
+			printOpts(cfg)
+			fmt.Println(strings.Repeat("=", 20))
+		}
 	}
 }
 
@@ -156,7 +158,7 @@ func writeStatus(state *State, s string) {
 		fmt.Fprintln(v, getStatus(state))
 		sprint := fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(state.DirbProgress))/float64(atomic.LoadUint32(state.WordlistLen)), s)
 		fmt.Fprintln(v, sprint)
-		fmt.Fprintln(v, "ctrl + [(c) quit, (x) stop current dir")
+		fmt.Fprintln(v, "ctrl + [(c) quit, (x) stop current dir], (arrow up/down) move one line, (pgup/pgdown) move 10 lines")
 		fmt.Fprintln(v, time.Now().String())
 		return nil
 	})
