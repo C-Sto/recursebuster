@@ -19,7 +19,9 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.4.4"
+
+const version = "1.5.0"
+
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -69,6 +71,7 @@ func main() {
 	flag.BoolVar(&cfg.NoStatus, "nostatus", false, "Don't print status info (for if it messes with the terminal)")
 	flag.BoolVar(&cfg.NoStartStop, "nostartstop", false, "Don't show start/stop info messages")
 	flag.BoolVar(&cfg.NoWildcardChecks, "nowildcard", false, "Don't perform wildcard checks for soft 404 detection")
+	flag.BoolVar(&cfg.NoUI, "noui", false, "Don't use sexy ui")
 	flag.StringVar(&cfg.Localpath, "o", "."+string(os.PathSeparator)+"busted.txt", "Local file to dump into")
 	flag.StringVar(&cfg.Methods, "methods", "GET", "Methods to use for checks. Multiple methods can be specified, comma separate them. Requests will be sent with an empty body (unless body is specified)")
 	flag.StringVar(&cfg.ProxyAddr, "proxy", "", "Proxy configuration options in the form ip:port eg: 127.0.0.1:9050. Note! If you want this to work with burp/use it with a HTTP proxy, specify as http://ip:port")
@@ -93,6 +96,7 @@ func main() {
 	setupConfig(cfg, globalState, urlSlice[0], printChan)
 
 	setupState(globalState, cfg, wg, printChan)
+	librecursebuster.SetState(globalState)
 
 	//setup channels
 	pages := make(chan librecursebuster.SpiderPage, 1000)
@@ -101,16 +105,26 @@ func main() {
 	workers := make(chan struct{}, cfg.Threads)
 	maxDirs := make(chan struct{}, cfg.MaxDirs)
 	testChan := make(chan string, 100)
-
-	librecursebuster.PrintBanner(cfg)
+	quitChan := make(chan struct{})
 
 	//do first load of urls (send canary requests to make sure we can dirbust them)
 
 	globalState.StartTime = time.Now()
 	globalState.PerSecondShort = new(uint64)
 	globalState.PerSecondLong = new(uint64)
-
-	go librecursebuster.StatusPrinter(cfg, globalState, wg, printChan, testChan)
+	if !cfg.NoUI {
+		uiWG := &sync.WaitGroup{}
+		uiWG.Add(1)
+		go uiQuit(quitChan)
+		go globalState.StartUI(uiWG, quitChan)
+		uiWG.Wait()
+	}
+	librecursebuster.PrintBanner(cfg)
+	if cfg.NoUI {
+		go librecursebuster.StatusPrinter(cfg, globalState, wg, printChan, testChan)
+	} else {
+		go librecursebuster.UIPrinter(cfg, globalState, wg, printChan, testChan)
+	}
 	go librecursebuster.ManageRequests(cfg, globalState, wg, pages, newPages, confirmed, workers, printChan, maxDirs, testChan)
 	go librecursebuster.ManageNewURLs(cfg, globalState, wg, pages, newPages, printChan)
 	go librecursebuster.OutputWriter(wg, cfg, confirmed, cfg.Localpath, printChan)
@@ -179,6 +193,11 @@ func getURLSlice(cfg *librecursebuster.Config, printChan chan librecursebuster.O
 	return urlSlice
 }
 
+func uiQuit(quitChan chan struct{}) {
+	<-quitChan
+	os.Exit(0)
+}
+
 func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Config, wg *sync.WaitGroup, printChan chan librecursebuster.OutLine) {
 	for _, x := range strings.Split(cfg.Extensions, ",") {
 		globalState.Extensions = append(globalState.Extensions, x)
@@ -198,6 +217,11 @@ func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Confi
 
 	globalState.Client = librecursebuster.ConfigureHTTPClient(cfg, wg, printChan, false)
 	globalState.BurpClient = librecursebuster.ConfigureHTTPClient(cfg, wg, printChan, true)
+
+	globalState.StopDir = make(chan struct{}, 1)
+	globalState.CMut = &sync.RWMutex{}
+	globalState.Checked = make(map[string]bool)
+	globalState.Version = cfg.Version
 
 	if cfg.BlacklistLocation != "" {
 		readerChan := make(chan string, 100)
@@ -304,14 +328,21 @@ func startBusting(wg *sync.WaitGroup, globalState *librecursebuster.State, cfg *
 	x.URL = u.String()
 	x.Reference = &u
 
-	if !strings.HasSuffix(u.String(), "/") {
+	globalState.CMut.Lock()
+	defer globalState.CMut.Unlock()
+	if ok := globalState.Checked[u.String()+"/"]; !strings.HasSuffix(u.String(), "/") && !ok {
 		wg.Add(1)
 		pages <- librecursebuster.SpiderPage{
 			URL:       u.String() + "/",
 			Reference: &u,
 		}
+		globalState.Checked[u.String()+"/"] = true
+		librecursebuster.PrintOutput("URL Added: "+u.String()+"/", librecursebuster.Debug, 3, wg, printChan)
 	}
-
-	wg.Add(1)
-	pages <- x
+	if ok := globalState.Checked[x.URL]; !ok {
+		wg.Add(1)
+		pages <- x
+		globalState.Checked[x.URL] = true
+		librecursebuster.PrintOutput("URL Added: "+x.URL, librecursebuster.Debug, 3, wg, printChan)
+	}
 }

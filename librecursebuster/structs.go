@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jroimartin/gocui"
+
 	"github.com/fatih/color"
 )
 
@@ -79,6 +81,12 @@ type OutLine struct {
 	Type    *ConsoleWriter
 }
 
+var gState *State
+
+func SetState(s *State) {
+	gState = s
+}
+
 //State represents the current state of the program. Options are not configured here, those are found in Config.
 type State struct {
 	//Should probably have different concepts between config and state. Configs that might change depending on the URL being queried
@@ -98,10 +106,17 @@ type State struct {
 	WordlistLen    *uint32
 	DirbProgress   *uint32
 
+	StopDir chan struct{} //should probably have all teh chans in here
+
+	Checked map[string]bool
+	CMut    *sync.RWMutex
+
+	ui *gocui.Gui
 	//per host States
 	Hosts HostStates
 	//ParsedURL           *url.URL
 	//Soft404ResponseBody []byte
+	Version string
 }
 
 //HostStates represents the interface to the Host States..? (all this smells of bad hacks)
@@ -180,6 +195,7 @@ type Config struct {
 	NoSpider          bool
 	NoStatus          bool
 	NoStartStop       bool
+	NoUI              bool
 	NoWildcardChecks  bool
 	ProxyAddr         string
 	Ratio404          float64

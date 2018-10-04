@@ -8,19 +8,23 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/jroimartin/gocui"
 )
 
 //PrintBanner prints the banner and in debug mode will also print all set options
 func PrintBanner(cfg *Config) {
 	//todo: include settings in banner
-	fmt.Println(strings.Repeat("=", 20))
-	fmt.Println("recursebuster V" + cfg.Version)
-	fmt.Println("Poorly hacked together by C_Sto (@C__Sto)")
-	fmt.Println("Heavy influence from Gograbber, thx Swarlz")
-	fmt.Println(strings.Repeat("=", 20))
-	if cfg.Debug {
-		printOpts(cfg)
+	if cfg.NoUI {
 		fmt.Println(strings.Repeat("=", 20))
+		fmt.Println("recursebuster V" + cfg.Version)
+		fmt.Println("Poorly hacked together by C_Sto (@C__Sto)")
+		fmt.Println("Heavy influence from Gograbber, thx Swarlz")
+		fmt.Println(strings.Repeat("=", 20))
+		if cfg.Debug {
+			printOpts(cfg)
+			fmt.Println(strings.Repeat("=", 20))
+		}
 	}
 }
 
@@ -107,6 +111,59 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sy
 	}
 }
 
+func UIPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
+	tick := time.NewTicker(time.Second * 2)
+	testedURL := ""
+	for {
+		select {
+		case o := <-printChan:
+			//something to print
+			//v.Write([]byte(o.Content + "\n"))
+			if cfg.VerboseLevel >= o.Level {
+				addToMainUI(state, o)
+			}
+			//state.ui.Update()
+			//fmt.Fprintln(v, o.Content+"\n")
+
+		case <-tick.C:
+			//time has elapsed the amount of time - it's been 2 seconds
+
+		case t := <-testChan:
+			//URL has been assessed
+			testedURL = t
+		}
+		writeStatus(state, testedURL)
+	}
+}
+
+func addToMainUI(state *State, o OutLine) { //s string) {
+	state.ui.Update(func(g *gocui.Gui) error {
+		v, err := g.View("Main")
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(v, o.Type.GetPrefix()+o.Content)
+		return nil
+	})
+}
+
+func writeStatus(state *State, s string) {
+	state.ui.Update(func(g *gocui.Gui) error {
+		v, err := g.View("Status")
+		if err != nil {
+			return err
+			// handle error
+		}
+		v.Clear()
+		fmt.Fprintln(v, getStatus(state))
+		sprint := fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(state.DirbProgress))/float64(atomic.LoadUint32(state.WordlistLen)), s)
+		fmt.Fprintln(v, sprint)
+		fmt.Fprintln(v, "ctrl + [(c) quit, (x) stop current dir], (arrow up/down) move one line, (pgup/pgdown) move 10 lines")
+		fmt.Fprintln(v, time.Now().String())
+		return nil
+	})
+}
+
 //StatusPrinter is the function that performs all the status printing logic
 func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
 	tick := time.NewTicker(time.Second * 2)
@@ -117,13 +174,24 @@ func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan
 		select {
 		case o := <-printChan:
 			//shoudln't need to check for status here..
-
 			//clear the line before printing anything
-			fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
+			if cfg.NoUI {
+				fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
+			}
 
 			if cfg.VerboseLevel >= o.Level {
-				o.Type.Println(o.Content)
-				//don't need to remember spaces to clear this line - this is newline suffixed
+				if cfg.NoUI {
+					o.Type.Println(o.Content)
+					//don't need to remember spaces to clear this line - this is newline suffixed
+				} else {
+					v, err := state.ui.View("Main")
+					if err != nil {
+						panic(err)
+					}
+					fmt.Fprintln(v, o.Content+"\n")
+					//v.Write([]byte(o.Content))
+					//o.Type.Fprintf(v, o.Content, nil...)
+				}
 			}
 			wg.Done()
 
@@ -135,9 +203,9 @@ func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan
 			testedURL = t
 		}
 
-		if !cfg.NoStatus {
+		if !cfg.NoStatus && cfg.NoUI {
 			//assemble the status string
-			sprint := fmt.Sprintf("%s"+black.Sprintf(">"), status)
+			sprint := fmt.Sprintf("%s"+black.Sprint(">"), status)
 			if cfg.MaxDirs == 1 && cfg.Wordlist != "" {
 				//this is the grossest format string I ever did see
 				sprint += fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(state.DirbProgress))/float64(atomic.LoadUint32(state.WordlistLen)), testedURL)
@@ -149,6 +217,11 @@ func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan
 			fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
 
 			Status.Printf(sprint + "\r")
+			/*		v, err := state.ui.View("Main")
+					if err != nil {
+						panic(err)
+					}
+					fmt.Fprintln(v, sprint+"\n")*/
 			//remember how many spaces we need to use to clear the line (21 for the date and time prefix)
 			spacesToClear = len(sprint) + 21
 		}

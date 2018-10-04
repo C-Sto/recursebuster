@@ -17,7 +17,6 @@ type ConsoleWriter struct {
 }
 
 //This is super stupid, I should use a lib for this
-
 func (c *ConsoleWriter) formatHeader(buf *[]byte, t time.Time, file string, line int) {
 	*buf = append(*buf, c.prefix...)
 	year, month, day := t.Date()
@@ -61,6 +60,10 @@ func (ConsoleWriter) New(w io.Writer, prefix string) *ConsoleWriter {
 	return &ConsoleWriter{out: w, prefix: prefix, flag: 0, mu: m}
 }
 
+func (c ConsoleWriter) GetPrefix() string {
+	return c.prefix
+}
+
 // Output writes the output for an event. The string s contains
 // the text to print after the prefix specified by the flags of the
 // Logger. A newline is appended if the last character of s is not
@@ -96,4 +99,17 @@ func (c *ConsoleWriter) Printf(format string, v ...interface{}) {
 	if err != nil {
 		fmt.Println(err)
 	}
+}
+
+func (c *ConsoleWriter) Fprintf(w io.Writer, format string, a ...interface{}) (n int, err error) {
+	now := time.Now() // get this early.
+	var file string
+	var line int
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.buf = c.buf[:0]
+	c.formatHeader(&c.buf, now, file, line)
+	c.buf = append(c.buf, fmt.Sprintf(format, a)...)
+	n, err = w.Write(c.buf)
+	return
 }
