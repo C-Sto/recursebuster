@@ -8,6 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/jroimartin/gocui"
 )
 
 //PrintBanner prints the banner and in debug mode will also print all set options
@@ -107,6 +109,73 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sy
 	}
 }
 
+func UIPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
+	tick := time.NewTicker(time.Second * 2)
+	testedURL := ""
+	for {
+		select {
+		case o := <-printChan:
+			//something to print
+			//v.Write([]byte(o.Content + "\n"))
+			if cfg.VerboseLevel >= o.Level {
+				addToMainUI(state, o.Content)
+			}
+			//state.ui.Update()
+			//fmt.Fprintln(v, o.Content+"\n")
+
+		case <-tick.C:
+			//time has elapsed the amount of time - it's been 2 seconds
+
+		case t := <-testChan:
+			//URL has been assessed
+			testedURL = t
+		}
+		writeStatus(state, testedURL)
+	}
+}
+
+func addToMainUI(state *State, s string) {
+	state.ui.Update(func(g *gocui.Gui) error {
+		v, err := g.View("Main")
+		if err != nil {
+			return err
+			// handle error
+		}
+		//remove from top line if more lines than view height
+		_, y := v.Size()
+		if len(v.ViewBufferLines()) > y {
+			newWrite := v.ViewBufferLines()[1:] //pop off last element, and append new line
+			newWrite = append(newWrite, s)
+			v.Clear()
+			//fmt.Fprint(v, newWrite)
+			for _, line := range newWrite {
+				if line == "" {
+					continue
+				}
+				fmt.Fprintln(v, strings.Trim(line, "\n"))
+			}
+		} else {
+			fmt.Fprintln(v, s)
+		}
+		return nil
+	})
+}
+
+func writeStatus(state *State, s string) {
+	state.ui.Update(func(g *gocui.Gui) error {
+		v, err := g.View("Status")
+		if err != nil {
+			return err
+			// handle error
+		}
+		v.Clear()
+		fmt.Fprintln(v, getStatus(state))
+		sprint := fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(state.DirbProgress))/float64(atomic.LoadUint32(state.WordlistLen)), s)
+		fmt.Fprintln(v, sprint)
+		return nil
+	})
+}
+
 //StatusPrinter is the function that performs all the status printing logic
 func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
 	tick := time.NewTicker(time.Second * 2)
@@ -117,13 +186,24 @@ func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan
 		select {
 		case o := <-printChan:
 			//shoudln't need to check for status here..
-
 			//clear the line before printing anything
-			fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
+			if cfg.NoUI {
+				fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
+			}
 
 			if cfg.VerboseLevel >= o.Level {
-				o.Type.Println(o.Content)
-				//don't need to remember spaces to clear this line - this is newline suffixed
+				if cfg.NoUI {
+					o.Type.Println(o.Content)
+					//don't need to remember spaces to clear this line - this is newline suffixed
+				} else {
+					v, err := state.ui.View("Main")
+					if err != nil {
+						panic(err)
+					}
+					fmt.Fprintln(v, o.Content+"\n")
+					//v.Write([]byte(o.Content))
+					//o.Type.Fprintf(v, o.Content, nil...)
+				}
 			}
 			wg.Done()
 
@@ -146,9 +226,14 @@ func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan
 			}
 
 			//flush the line
-			fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
+			//fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
 
-			Status.Printf(sprint + "\r")
+			//Status.Printf(sprint + "\r")
+			v, err := state.ui.View("Main")
+			if err != nil {
+				panic(err)
+			}
+			fmt.Fprintln(v, sprint+"\n")
 			//remember how many spaces we need to use to clear the line (21 for the date and time prefix)
 			spacesToClear = len(sprint) + 21
 		}

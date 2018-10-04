@@ -97,3 +97,16 @@ func (c *ConsoleWriter) Printf(format string, v ...interface{}) {
 		fmt.Println(err)
 	}
 }
+
+func (c *ConsoleWriter) Fprintf(w io.Writer, format string, a ...interface{}) (n int, err error) {
+	now := time.Now() // get this early.
+	var file string
+	var line int
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.buf = c.buf[:0]
+	c.formatHeader(&c.buf, now, file, line)
+	c.buf = append(c.buf, fmt.Sprintf(format, a)...)
+	n, err = w.Write(c.buf)
+	return
+}

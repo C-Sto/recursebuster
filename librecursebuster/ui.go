@@ -3,16 +3,16 @@ package librecursebuster
 import (
 	"fmt"
 	"os"
+	"sync"
 
 	ui "github.com/jroimartin/gocui"
 )
 
-func (s *State) StartUI() {
+func (s *State) StartUI(wg *sync.WaitGroup) {
 	g, err := ui.NewGui(ui.OutputNormal)
 
 	if err != nil {
 		panic(err)
-		return
 	}
 	s.ui = g
 	defer s.ui.Close()
@@ -22,19 +22,16 @@ func (s *State) StartUI() {
 	err = s.ui.SetKeybinding("", ui.KeyCtrlX, ui.ModNone, handleX)
 	if err != nil {
 		panic(err)
-		return
 	}
 
 	err = s.ui.SetKeybinding("", ui.KeyCtrlC, ui.ModNone, quit)
 	if err != nil {
 		panic(err)
-		return
 	}
-
+	wg.Done()
 	err = s.ui.MainLoop()
 	if err != nil && err != ui.ErrQuit {
 		panic(err)
-		return
 	}
 
 }
@@ -53,7 +50,11 @@ func quit(g *ui.Gui, v *ui.View) error {
 
 func layout(g *ui.Gui) error {
 	mX, mY := g.Size()
-	_, err := g.SetView("Main", 0, 0, mX-1, mY-1)
+	_, err := g.SetView("Main", 0, 0, mX-1, mY-6)
+	if err != nil && err != ui.ErrUnknownView {
+		return err
+	}
+	_, err = g.SetView("Status", 0, mY-5, mX-1, mY-1)
 	if err != nil && err != ui.ErrUnknownView {
 		return err
 	}

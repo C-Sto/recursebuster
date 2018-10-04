@@ -69,6 +69,7 @@ func main() {
 	flag.BoolVar(&cfg.NoStatus, "nostatus", false, "Don't print status info (for if it messes with the terminal)")
 	flag.BoolVar(&cfg.NoStartStop, "nostartstop", false, "Don't show start/stop info messages")
 	flag.BoolVar(&cfg.NoWildcardChecks, "nowildcard", false, "Don't perform wildcard checks for soft 404 detection")
+	flag.BoolVar(&cfg.NoUI, "noui", false, "Don't use sexy ui")
 	flag.StringVar(&cfg.Localpath, "o", "."+string(os.PathSeparator)+"busted.txt", "Local file to dump into")
 	flag.StringVar(&cfg.Methods, "methods", "GET", "Methods to use for checks. Multiple methods can be specified, comma separate them. Requests will be sent with an empty body (unless body is specified)")
 	flag.StringVar(&cfg.ProxyAddr, "proxy", "", "Proxy configuration options in the form ip:port eg: 127.0.0.1:9050. Note! If you want this to work with burp/use it with a HTTP proxy, specify as http://ip:port")
@@ -109,8 +110,15 @@ func main() {
 	globalState.StartTime = time.Now()
 	globalState.PerSecondShort = new(uint64)
 	globalState.PerSecondLong = new(uint64)
-
-	go librecursebuster.StatusPrinter(cfg, globalState, wg, printChan, testChan)
+	uiWG := &sync.WaitGroup{}
+	uiWG.Add(1)
+	go globalState.StartUI(uiWG)
+	uiWG.Wait()
+	if cfg.NoUI {
+		go librecursebuster.StatusPrinter(cfg, globalState, wg, printChan, testChan)
+	} else {
+		go librecursebuster.UIPrinter(cfg, globalState, wg, printChan, testChan)
+	}
 	go librecursebuster.ManageRequests(cfg, globalState, wg, pages, newPages, confirmed, workers, printChan, maxDirs, testChan)
 	go librecursebuster.ManageNewURLs(cfg, globalState, wg, pages, newPages, printChan)
 	go librecursebuster.OutputWriter(wg, cfg, confirmed, cfg.Localpath, printChan)
