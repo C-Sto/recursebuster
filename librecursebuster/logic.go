@@ -98,6 +98,9 @@ func ManageNewURLs(cfg *Config, state *State, wg *sync.WaitGroup, pages, newpage
 				newPage := SpiderPage{}
 				newPage.URL = newDir
 				newPage.Reference = candidate.Reference
+				if checked[actualURL] {
+					continue
+				}
 				wg.Add(1)
 				newpages <- newPage
 			}
