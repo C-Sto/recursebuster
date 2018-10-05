@@ -15,7 +15,7 @@ import (
 //PrintBanner prints the banner and in debug mode will also print all set options
 func PrintBanner(cfg *Config) {
 	//todo: include settings in banner
-	if cfg.NoUI {
+	if cfg.NoUI || cfg.ShowVersion {
 		fmt.Println(strings.Repeat("=", 20))
 		fmt.Println("recursebuster V" + cfg.Version)
 		fmt.Println("Poorly hacked together by C_Sto (@C__Sto)")
