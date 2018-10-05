@@ -19,9 +19,7 @@ import (
 	"github.com/fatih/color"
 )
 
-
-const version = "1.5.0"
-
+const version = "1.5.1"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -88,6 +86,11 @@ func main() {
 	flag.StringVar(&cfg.WhitelistLocation, "whitelist", "", "Whitelist of domains to include in brute-force")
 
 	flag.Parse()
+
+	if cfg.ShowVersion {
+		librecursebuster.PrintBanner(cfg)
+		os.Exit(0)
+	}
 
 	printChan := make(chan librecursebuster.OutLine, 200)
 
@@ -260,11 +263,6 @@ func setupConfig(cfg *librecursebuster.Config, globalState *librecursebuster.Sta
 		go func() {
 			http.ListenAndServe("localhost:6061", http.DefaultServeMux)
 		}()
-	}
-
-	if cfg.ShowVersion {
-		librecursebuster.PrintBanner(cfg)
-		os.Exit(0)
 	}
 
 	if cfg.URL == "" && cfg.InputList == "" {
