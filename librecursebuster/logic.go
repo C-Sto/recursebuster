@@ -10,27 +10,27 @@ import (
 )
 
 //ManageRequests handles the request workers
-func ManageRequests(cfg *Config, state *State, wg *sync.WaitGroup, pages, newPages, confirmed chan SpiderPage, workers chan struct{}, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
+func ManageRequests(cfg *Config, wg *sync.WaitGroup, pages, newPages, confirmed chan SpiderPage, workers chan struct{}, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
 	//manages net request workers
 	for {
 		page := <-pages
-		if state.Blacklist[page.URL] {
+		if gState.Blacklist[page.URL] {
 			wg.Done()
 			PrintOutput(fmt.Sprintf("Not testing blacklisted URL: %s", page.URL), Info, 0, wg, printChan)
 			continue
 		}
-		for _, method := range state.Methods {
+		for _, method := range gState.Methods {
 			if !cfg.NoBase {
 				workers <- struct{}{}
 				wg.Add(1)
-				go testURL(cfg, state, wg, method, page.URL, state.Client, newPages, workers, confirmed, printChan, testChan)
+				go testURL(cfg, wg, method, page.URL, gState.Client, newPages, workers, confirmed, printChan, testChan)
 			}
 			if cfg.Wordlist != "" && string(page.URL[len(page.URL)-1]) == "/" { //if we are testing a directory
 
 				//check for wildcard response
 
 				wg.Add(1)
-				go dirBust(cfg, state, page, wg, workers, pages, newPages, confirmed, printChan, maxDirs, testChan)
+				go dirBust(cfg, page, wg, workers, pages, newPages, confirmed, printChan, maxDirs, testChan)
 			}
 		}
 		wg.Done()
@@ -38,7 +38,7 @@ func ManageRequests(cfg *Config, state *State, wg *sync.WaitGroup, pages, newPag
 }
 
 //ManageNewURLs will take in any URL, and decide if it should be added to the queue for bustin', or if we discovered something new
-func ManageNewURLs(cfg *Config, state *State, wg *sync.WaitGroup, pages, newpages chan SpiderPage, printChan chan OutLine) {
+func ManageNewURLs(cfg *Config, wg *sync.WaitGroup, pages, newpages chan SpiderPage, printChan chan OutLine) {
 	//decides on whether to add to the directory list, or add to file output
 	for {
 		candidate := <-newpages
@@ -57,15 +57,15 @@ func ManageNewURLs(cfg *Config, state *State, wg *sync.WaitGroup, pages, newpage
 			u.Host = candidate.Reference.Host
 		}
 
-		//actualUrl := state.ParsedURL.Scheme + "://" + u.Host
+		//actualUrl := gState.ParsedURL.Scheme + "://" + u.Host
 		actualURL := cleanURL(u, (*candidate.Reference).Scheme+"://"+u.Host)
 
-		state.CMut.Lock()
-		if _, ok := state.Checked[actualURL]; !ok && //must have not checked it before
-			(state.Hosts.HostExists(u.Host) || state.Whitelist[u.Host]) && //must be within whitelist, or be one of the starting urls
+		gState.CMut.Lock()
+		if _, ok := gState.Checked[actualURL]; !ok && //must have not checked it before
+			(gState.Hosts.HostExists(u.Host) || gState.Whitelist[u.Host]) && //must be within whitelist, or be one of the starting urls
 			!cfg.NoRecursion { //no recursion means we don't care about adding extra paths or content
-			state.Checked[actualURL] = true
-			state.CMut.Unlock()
+			gState.Checked[actualURL] = true
+			gState.CMut.Unlock()
 			wg.Add(1)
 			pages <- SpiderPage{URL: actualURL, Reference: candidate.Reference}
 			PrintOutput("URL Added: "+actualURL, Debug, 3, wg, printChan)
@@ -88,29 +88,29 @@ func ManageNewURLs(cfg *Config, state *State, wg *sync.WaitGroup, pages, newpage
 				newPage := SpiderPage{}
 				newPage.URL = newDir
 				newPage.Reference = candidate.Reference
-				state.CMut.RLock()
-				if state.Checked[newDir] {
-					state.CMut.RUnlock()
+				gState.CMut.RLock()
+				if gState.Checked[newDir] {
+					gState.CMut.RUnlock()
 					continue
 				}
-				state.CMut.RUnlock()
+				gState.CMut.RUnlock()
 				wg.Add(1)
 				newpages <- newPage
 			}
 		} else {
-			state.CMut.Unlock()
+			gState.CMut.Unlock()
 		}
 
 		wg.Done()
 	}
 }
 
-func testURL(cfg *Config, state *State, wg *sync.WaitGroup, method string, urlString string, client *http.Client,
+func testURL(cfg *Config, wg *sync.WaitGroup, method string, urlString string, client *http.Client,
 	newPages chan SpiderPage, workers chan struct{},
 	confirmedGood chan SpiderPage, printChan chan OutLine, testChan chan string) {
 	defer func() {
 		wg.Done()
-		atomic.AddUint64(state.TotalTested, 1)
+		atomic.AddUint64(gState.TotalTested, 1)
 	}()
 
 	select {
@@ -118,7 +118,7 @@ func testURL(cfg *Config, state *State, wg *sync.WaitGroup, method string, urlSt
 	default: //this is to prevent blocking, it doesn't _really_ matter if it doesn't get written to output
 	}
 
-	headResp, content, good := evaluateURL(wg, cfg, state, method, urlString, client, workers, printChan)
+	headResp, content, good := evaluateURL(wg, cfg, method, urlString, client, workers, printChan)
 
 	if !good && !cfg.ShowAll {
 		return
@@ -155,7 +155,7 @@ func testURL(cfg *Config, state *State, wg *sync.WaitGroup, method string, urlSt
 	}
 }
 
-func dirBust(cfg *Config, state *State, page SpiderPage, wg *sync.WaitGroup, workers chan struct{}, pages, newPages, confirmed chan SpiderPage, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
+func dirBust(cfg *Config, page SpiderPage, wg *sync.WaitGroup, workers chan struct{}, pages, newPages, confirmed chan SpiderPage, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
 	defer wg.Done()
 
 	//ugh
@@ -167,10 +167,10 @@ func dirBust(cfg *Config, state *State, page SpiderPage, wg *sync.WaitGroup, wor
 	//check to make sure we aren't dirbusting a wildcardyboi (NOTE!!! USES FIRST SPECIFIED MEHTOD TO DO SOFT 404!)
 	if !cfg.NoWildcardChecks {
 		workers <- struct{}{}
-		_, x, res := evaluateURL(wg, cfg, state, state.Methods[0], page.URL+RandString(printChan), state.Client, workers, printChan)
+		_, x, res := evaluateURL(wg, cfg, gState.Methods[0], page.URL+RandString(printChan), gState.Client, workers, printChan)
 
 		if res { //true response indicates a good response for a guid path, unlikely good
-			if detectSoft404(x, state.Hosts.Get404Body(u.Host), cfg.Ratio404) {
+			if detectSoft404(x, gState.Hosts.Get404Body(u.Host), cfg.Ratio404) {
 				//it's a soft404 probably, guess we can continue (this logic seems wrong??)
 			} else {
 				PrintOutput(
@@ -193,39 +193,39 @@ func dirBust(cfg *Config, state *State, page SpiderPage, wg *sync.WaitGroup, wor
 		)
 	}
 	if cfg.MaxDirs == 1 {
-		atomic.StoreUint32(state.DirbProgress, 0)
+		atomic.StoreUint32(gState.DirbProgress, 0)
 	}
 
 	for word := range wordsChan { //will receive from the channel until it's closed
 		//read words off the channel, and test it OR close out because we wanna skip it
 		select {
-		case <-state.StopDir:
+		case <-gState.StopDir:
 			<-maxDirs
 			if !cfg.NoStartStop {
 				PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0, wg, printChan)
 			}
 			return
 		default:
-			for _, method := range state.Methods {
+			for _, method := range gState.Methods {
 
-				if len(state.Extensions) > 0 && state.Extensions[0] != "" {
-					for _, ext := range state.Extensions {
+				if len(gState.Extensions) > 0 && gState.Extensions[0] != "" {
+					for _, ext := range gState.Extensions {
 						workers <- struct{}{}
 						wg.Add(1)
-						go testURL(cfg, state, wg, method, page.URL+word+"."+ext, state.Client, newPages, workers, confirmed, printChan, testChan)
+						go testURL(cfg, wg, method, page.URL+word+"."+ext, gState.Client, newPages, workers, confirmed, printChan, testChan)
 					}
 				}
 				if cfg.AppendDir {
 					workers <- struct{}{}
 					wg.Add(1)
-					go testURL(cfg, state, wg, method, page.URL+word+"/", state.Client, newPages, workers, confirmed, printChan, testChan)
+					go testURL(cfg, wg, method, page.URL+word+"/", gState.Client, newPages, workers, confirmed, printChan, testChan)
 				}
 				workers <- struct{}{}
 				wg.Add(1)
-				go testURL(cfg, state, wg, method, page.URL+word, state.Client, newPages, workers, confirmed, printChan, testChan)
+				go testURL(cfg, wg, method, page.URL+word, gState.Client, newPages, workers, confirmed, printChan, testChan)
 
 				if cfg.MaxDirs == 1 {
-					atomic.AddUint32(state.DirbProgress, 1)
+					atomic.AddUint32(gState.DirbProgress, 1)
 				}
 			}
 		}

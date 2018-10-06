@@ -19,7 +19,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.5.1"
+const version = "1.5.2"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -92,6 +92,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	if cfg.URL == "" && cfg.InputList == "" {
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	printChan := make(chan librecursebuster.OutLine, 200)
 
 	urlSlice := getURLSlice(cfg, printChan)
@@ -99,7 +104,6 @@ func main() {
 	setupConfig(cfg, globalState, urlSlice[0], printChan)
 
 	setupState(globalState, cfg, wg, printChan)
-	librecursebuster.SetState(globalState)
 
 	//setup channels
 	pages := make(chan librecursebuster.SpiderPage, 1000)
@@ -124,14 +128,14 @@ func main() {
 	}
 	librecursebuster.PrintBanner(cfg)
 	if cfg.NoUI {
-		go librecursebuster.StatusPrinter(cfg, globalState, wg, printChan, testChan)
+		go librecursebuster.StatusPrinter(cfg, wg, printChan, testChan)
 	} else {
-		go librecursebuster.UIPrinter(cfg, globalState, wg, printChan, testChan)
+		go librecursebuster.UIPrinter(cfg, wg, printChan, testChan)
 	}
-	go librecursebuster.ManageRequests(cfg, globalState, wg, pages, newPages, confirmed, workers, printChan, maxDirs, testChan)
-	go librecursebuster.ManageNewURLs(cfg, globalState, wg, pages, newPages, printChan)
+	go librecursebuster.ManageRequests(cfg, wg, pages, newPages, confirmed, workers, printChan, maxDirs, testChan)
+	go librecursebuster.ManageNewURLs(cfg, wg, pages, newPages, printChan)
 	go librecursebuster.OutputWriter(wg, cfg, confirmed, cfg.Localpath, printChan)
-	go librecursebuster.StatsTracker(globalState)
+	go librecursebuster.StatsTracker()
 
 	librecursebuster.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0, wg, printChan)
 
@@ -256,6 +260,7 @@ func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Confi
 			atomic.AddUint32(globalState.WordlistLen, 1)
 		}
 	}
+	librecursebuster.SetState(globalState)
 }
 
 func setupConfig(cfg *librecursebuster.Config, globalState *librecursebuster.State, urlSliceZero string, printChan chan librecursebuster.OutLine) {
@@ -265,10 +270,6 @@ func setupConfig(cfg *librecursebuster.Config, globalState *librecursebuster.Sta
 		}()
 	}
 
-	if cfg.URL == "" && cfg.InputList == "" {
-		flag.Usage()
-		os.Exit(1)
-	}
 	var h *url.URL
 	var err error
 	h, err = url.Parse(urlSliceZero)

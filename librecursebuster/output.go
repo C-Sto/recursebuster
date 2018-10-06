@@ -112,7 +112,7 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sy
 }
 
 //UIPrinter is called to write a pretty UI
-func UIPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
+func UIPrinter(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
 	tick := time.NewTicker(time.Second * 2)
 	testedURL := ""
 	for {
@@ -121,9 +121,9 @@ func UIPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan Out
 			//something to print
 			//v.Write([]byte(o.Content + "\n"))
 			if cfg.VerboseLevel >= o.Level {
-				addToMainUI(state, o)
+				addToMainUI(o)
 			}
-			//state.ui.Update()
+			//gState.ui.Update()
 			//fmt.Fprintln(v, o.Content+"\n")
 
 		case <-tick.C:
@@ -133,12 +133,12 @@ func UIPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan Out
 			//URL has been assessed
 			testedURL = t
 		}
-		writeStatus(state, testedURL)
+		writeStatus(testedURL)
 	}
 }
 
-func addToMainUI(state *State, o OutLine) { //s string) {
-	state.ui.Update(func(g *gocui.Gui) error {
+func addToMainUI(o OutLine) { //s string) {
+	gState.ui.Update(func(g *gocui.Gui) error {
 		v, err := g.View("Main")
 		if err != nil {
 			return err
@@ -148,16 +148,16 @@ func addToMainUI(state *State, o OutLine) { //s string) {
 	})
 }
 
-func writeStatus(state *State, s string) {
-	state.ui.Update(func(g *gocui.Gui) error {
+func writeStatus(s string) {
+	gState.ui.Update(func(g *gocui.Gui) error {
 		v, err := g.View("Status")
 		if err != nil {
 			return err
 			// handle error
 		}
 		v.Clear()
-		fmt.Fprintln(v, getStatus(state))
-		sprint := fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(state.DirbProgress))/float64(atomic.LoadUint32(state.WordlistLen)), s)
+		fmt.Fprintln(v, getStatus())
+		sprint := fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(atomic.LoadUint32(gState.WordlistLen)), s)
 		fmt.Fprintln(v, sprint)
 		fmt.Fprintln(v, "ctrl + [(c) quit, (x) stop current dir], (arrow up/down) move one line, (pgup/pgdown) move 10 lines")
 		fmt.Fprintln(v, time.Now().String())
@@ -166,9 +166,9 @@ func writeStatus(state *State, s string) {
 }
 
 //StatusPrinter is the function that performs all the status printing logic
-func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
+func StatusPrinter(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
 	tick := time.NewTicker(time.Second * 2)
-	status := getStatus(state)
+	status := getStatus()
 	spacesToClear := 0
 	testedURL := ""
 	for {
@@ -185,7 +185,7 @@ func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan
 					o.Type.Println(o.Content)
 					//don't need to remember spaces to clear this line - this is newline suffixed
 				} else {
-					v, err := state.ui.View("Main")
+					v, err := gState.ui.View("Main")
 					if err != nil {
 						panic(err)
 					}
@@ -197,10 +197,10 @@ func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan
 			wg.Done()
 
 		case <-tick.C: //time has elapsed the amount of time - it's been 2 seconds
-			status = getStatus(state)
+			status = getStatus()
 
 		case t := <-testChan: //a URL has been assessed
-			status = getStatus(state)
+			status = getStatus()
 			testedURL = t
 		}
 
@@ -209,7 +209,7 @@ func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan
 			sprint := fmt.Sprintf("%s"+black.Sprint(">"), status)
 			if cfg.MaxDirs == 1 && cfg.Wordlist != "" {
 				//this is the grossest format string I ever did see
-				sprint += fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(state.DirbProgress))/float64(atomic.LoadUint32(state.WordlistLen)), testedURL)
+				sprint += fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(atomic.LoadUint32(gState.WordlistLen)), testedURL)
 			} else {
 				sprint += fmt.Sprintf("%s", testedURL)
 			}
@@ -218,7 +218,7 @@ func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan
 			fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
 
 			Status.Printf(sprint + "\r")
-			/*		v, err := state.ui.View("Main")
+			/*		v, err := gState.ui.View("Main")
 					if err != nil {
 						panic(err)
 					}
@@ -230,34 +230,33 @@ func StatusPrinter(cfg *Config, state *State, wg *sync.WaitGroup, printChan chan
 	}
 }
 
-func getStatus(s *State) string {
-
+func getStatus() string {
 	return fmt.Sprintf("Tested: %d Speed(2s): %d/s Speed: %d/s",
-		atomic.LoadUint64(s.TotalTested),
-		atomic.LoadUint64(s.PerSecondShort),
-		atomic.LoadUint64(s.PerSecondLong),
+		atomic.LoadUint64(gState.TotalTested),
+		atomic.LoadUint64(gState.PerSecondShort),
+		atomic.LoadUint64(gState.PerSecondLong),
 	)
 }
 
 //StatsTracker updates the stats every so often
-func StatsTracker(state *State) {
+func StatsTracker() {
 	tick := time.NewTicker(time.Second * 2)
-	testedBefore := atomic.LoadUint64(state.TotalTested)
+	testedBefore := atomic.LoadUint64(gState.TotalTested)
 	timeBefore := time.Now()
 	for range tick.C {
-		testedNow := atomic.LoadUint64(state.TotalTested)
+		testedNow := atomic.LoadUint64(gState.TotalTested)
 
 		//calculate short average (tested since last tick)
 		testedInPeriod := testedNow - testedBefore
 		timeInPeriod := time.Since(timeBefore)
 		testedPerSecond := float64(testedInPeriod) / float64(timeInPeriod.Seconds())
-		atomic.StoreUint64(state.PerSecondShort, uint64(testedPerSecond))
+		atomic.StoreUint64(gState.PerSecondShort, uint64(testedPerSecond))
 
 		//calculate long average (tested per second since start)
 		testedInPeriod = testedNow
-		timeInPeriod = time.Since(state.StartTime)
+		timeInPeriod = time.Since(gState.StartTime)
 		testedPerSecond = float64(testedInPeriod) / float64(timeInPeriod.Seconds())
-		atomic.StoreUint64(state.PerSecondLong, uint64(testedPerSecond))
+		atomic.StoreUint64(gState.PerSecondLong, uint64(testedPerSecond))
 
 		testedBefore = testedNow
 		timeBefore = time.Now()

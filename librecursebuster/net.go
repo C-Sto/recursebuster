@@ -92,7 +92,7 @@ func HTTPReq(method, path string, client *http.Client, cfg *Config) (*http.Respo
 	return resp, body, err
 }
 
-func evaluateURL(wg *sync.WaitGroup, cfg *Config, state *State, method string, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
+func evaluateURL(wg *sync.WaitGroup, cfg *Config, method string, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
 	success = true
 
 	//optimize GET requests by sending a head first (it's cheaper)
@@ -106,7 +106,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg *Config, state *State, method string, u
 		}
 
 		//Check if we care about it (header only) section
-		if state.BadResponses[headResp.StatusCode] {
+		if gState.BadResponses[headResp.StatusCode] {
 			success = false
 			<-workers
 			return headResp, content, success
@@ -115,7 +115,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg *Config, state *State, method string, u
 		//this is all we have to do if we aren't doing GET's
 		if cfg.NoGet {
 			if cfg.BurpMode { //send successful request again... twice as many requests, but less burp spam
-				HTTPReq("HEAD", urlString, state.BurpClient, cfg) //send a HEAD. Ignore body response
+				HTTPReq("HEAD", urlString, gState.BurpClient, cfg) //send a HEAD. Ignore body response
 			}
 			<-workers
 			return headResp, content, success
@@ -132,7 +132,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg *Config, state *State, method string, u
 	}
 
 	//Check if we care about it (header only) section
-	if state.BadResponses[headResp.StatusCode] {
+	if gState.BadResponses[headResp.StatusCode] {
 		success = false
 		return headResp, content, success
 	}
@@ -145,21 +145,21 @@ func evaluateURL(wg *sync.WaitGroup, cfg *Config, state *State, method string, u
 			}
 		}
 	}
-	//if state.BadHeaders[headResp.Header.]
+	//if gState.BadHeaders[headResp.Header.]
 
 	//get content from validated path/file thing
 	if cfg.BurpMode {
-		HTTPReq(method, urlString, state.BurpClient, cfg)
+		HTTPReq(method, urlString, gState.BurpClient, cfg)
 	}
 
 	//check we care about it (body only) section
 	//double check that it's not 404/error using smart blockchain AI tech
 	PrintOutput(
 		fmt.Sprintf("Checking body for 404:\nContent: %v,\nSoft404:%v,\nResponse:%v",
-			string(content), string(state.Hosts.Get404Body(headResp.Request.Host)),
-			detectSoft404(content, state.Hosts.Get404Body(headResp.Request.Host), cfg.Ratio404)),
+			string(content), string(gState.Hosts.Get404Body(headResp.Request.Host)),
+			detectSoft404(content, gState.Hosts.Get404Body(headResp.Request.Host), cfg.Ratio404)),
 		Debug, 4, wg, printChan)
-	if detectSoft404(content, state.Hosts.Get404Body(headResp.Request.Host), cfg.Ratio404) {
+	if detectSoft404(content, gState.Hosts.Get404Body(headResp.Request.Host), cfg.Ratio404) {
 		success = false
 		//seems to be a soft 404 lol
 		return headResp, content, success

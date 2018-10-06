@@ -60,7 +60,7 @@ func (ConsoleWriter) New(w io.Writer, prefix string) *ConsoleWriter {
 	return &ConsoleWriter{out: w, prefix: prefix, flag: 0, mu: m}
 }
 
-//GetPrefix returns the prefix
+//GetPrefix returns the prefix unfiltered
 func (c ConsoleWriter) GetPrefix() string {
 	return c.prefix
 }
