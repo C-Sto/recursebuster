@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	_ "net/http/pprof"
@@ -19,7 +19,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.5.2"
+const version = "1.5.3"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -54,7 +54,7 @@ func main() {
 	flag.BoolVar(&cfg.CleanOutput, "clean", false, "Output clean URLs to the output file for easy loading into other tools and whatnot.")
 	flag.StringVar(&cfg.Cookies, "cookies", "", "Any cookies to include with requests. This is smashed into the cookies header, so copy straight from burp I guess.")
 	flag.BoolVar(&cfg.Debug, "debug", false, "Enable debugging")
-	flag.IntVar(&cfg.MaxDirs, "dirs", 1, "Maximum directories to perform busting on concurrently NOTE: directories will still be brute forced, this setting simply directs how many should be concurrently bruteforced")
+	//flag.IntVar(&cfg.MaxDirs, "dirs", 1, "Maximum directories to perform busting on concurrently forcing limit to 1 because it's complicated otherwise
 	flag.StringVar(&cfg.Extensions, "ext", "", "Extensions to append to checks. Multiple extensions can be specified, comma separate them.")
 	flag.Var(&cfg.Headers, "headers", "Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'")
 	flag.BoolVar(&cfg.HTTPS, "https", false, "Use HTTPS instead of HTTP.")
@@ -110,7 +110,7 @@ func main() {
 	newPages := make(chan librecursebuster.SpiderPage, 10000)
 	confirmed := make(chan librecursebuster.SpiderPage, 1000)
 	workers := make(chan struct{}, cfg.Threads)
-	maxDirs := make(chan struct{}, cfg.MaxDirs)
+	//maxDirs := make(chan struct{}, cfg.MaxDirs)
 	testChan := make(chan string, 100)
 	quitChan := make(chan struct{})
 
@@ -132,7 +132,7 @@ func main() {
 	} else {
 		go librecursebuster.UIPrinter(cfg, wg, printChan, testChan)
 	}
-	go librecursebuster.ManageRequests(cfg, wg, pages, newPages, confirmed, workers, printChan, maxDirs, testChan)
+	go librecursebuster.ManageRequests(cfg, wg, pages, newPages, confirmed, workers, printChan, testChan)
 	go librecursebuster.ManageNewURLs(cfg, wg, pages, newPages, printChan)
 	go librecursebuster.OutputWriter(wg, cfg, confirmed, cfg.Localpath, printChan)
 	go librecursebuster.StatsTracker()
@@ -173,6 +173,7 @@ func main() {
 
 	//wait for completion
 	wg.Wait()
+	librecursebuster.StopUI()
 
 }
 
@@ -246,18 +247,19 @@ func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Confi
 		}
 	}
 
-	if cfg.Wordlist != "" && cfg.MaxDirs == 1 {
+	if cfg.Wordlist != "" { // && cfg.MaxDirs == 1 {
 
 		zerod := uint32(0)
 		globalState.DirbProgress = &zerod
 
-		zero := uint32(0)
-		globalState.WordlistLen = &zero
+		//	zero := uint32(0)
+		//	globalState.WordlistLen = &zero
 
 		readerChan := make(chan string, 100)
 		go librecursebuster.LoadWords(cfg.Wordlist, readerChan, printChan)
-		for range readerChan {
-			atomic.AddUint32(globalState.WordlistLen, 1)
+		for v := range readerChan {
+			globalState.WordList = append(globalState.WordList, v)
+			//atomic.AddUint32(globalState.WordlistLen, 1)
 		}
 	}
 	librecursebuster.SetState(globalState)
@@ -298,7 +300,7 @@ func setupConfig(cfg *librecursebuster.Config, globalState *librecursebuster.Sta
 func startBusting(wg *sync.WaitGroup, globalState *librecursebuster.State, cfg *librecursebuster.Config, workers chan struct{}, printChan chan librecursebuster.OutLine, pages chan librecursebuster.SpiderPage, randURL string, u url.URL) {
 	defer wg.Done()
 	if !cfg.NoWildcardChecks {
-		resp, content, err := librecursebuster.HTTPReq("GET", randURL, globalState.Client, cfg)
+		resp, err := librecursebuster.HTTPReq("GET", randURL, globalState.Client, cfg)
 		<-workers
 		if err != nil {
 			if cfg.InputList != "" {
@@ -318,8 +320,8 @@ func startBusting(wg *sync.WaitGroup, globalState *librecursebuster.State, cfg *
 			fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
 			librecursebuster.Debug, 2, wg, printChan,
 		)
-
-		globalState.Hosts.AddSoft404Content(u.Host, content) // Soft404ResponseBody = xx
+		content, _ := ioutil.ReadAll(resp.Body)
+		globalState.Hosts.AddSoft404Content(u.Host, content, resp) // Soft404ResponseBody = xx
 	} else {
 		<-workers
 	}

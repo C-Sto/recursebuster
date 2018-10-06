@@ -104,8 +104,9 @@ type State struct {
 	BadResponses   map[int]bool //response codes to consider *dont care* (this might be worth putting in per host state, but idk how)
 	Extensions     []string
 	Methods        []string
-	WordlistLen    *uint32
-	DirbProgress   *uint32
+	//	WordlistLen    *uint32
+	WordList     []string
+	DirbProgress *uint32
 
 	StopDir chan struct{} //should probably have all teh chans in here
 
@@ -140,10 +141,10 @@ func (hs *HostStates) AddHost(u *url.URL) {
 }
 
 //AddSoft404Content sets the soft404 content retreived using the canary request to be compared against during the hacking phase
-func (hs *HostStates) AddSoft404Content(host string, content []byte) {
+func (hs *HostStates) AddSoft404Content(host string, content []byte, h *http.Response) {
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
-	hs.hosts[host] = HostState{ParsedURL: hs.hosts[host].ParsedURL, Soft404ResponseBody: content}
+	hs.hosts[host] = HostState{ParsedURL: hs.hosts[host].ParsedURL, Soft404ResponseBody: content, Response404: h}
 }
 
 //Get404Body returns the stored known-not-good body from a response
@@ -151,6 +152,13 @@ func (hs *HostStates) Get404Body(host string) []byte {
 	hs.mu.RLock()
 	defer hs.mu.RUnlock()
 	return hs.hosts[host].Soft404ResponseBody
+}
+
+//Get404 returns the stored known-not-good response
+func (hs *HostStates) Get404(host string) *http.Response {
+	hs.mu.RLock()
+	defer hs.mu.RUnlock()
+	return hs.hosts[host].Response404
 }
 
 //HostExists checks to see if the host string specified exists within the hosts states??
@@ -164,6 +172,7 @@ func (hs HostStates) HostExists(hval string) bool {
 //HostState is the actual state of each host (wow this is confusing and should be broken into different state files imo)
 type HostState struct {
 	ParsedURL           *url.URL
+	Response404         *http.Response
 	Soft404ResponseBody []byte
 }
 
@@ -187,7 +196,7 @@ type Config struct {
 	HTTPS             bool
 	InputList         string
 	Localpath         string
-	MaxDirs           int
+	//MaxDirs           int
 	Methods           string
 	NoBase            bool
 	NoGet             bool

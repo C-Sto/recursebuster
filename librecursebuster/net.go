@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -56,11 +57,11 @@ func ConfigureHTTPClient(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine
 
 //HTTPReq sends the HTTP request based on the given settings, returns the response and the body
 //todo: This can probably be optimized to exit once the head has been retreived and discard the body
-func HTTPReq(method, path string, client *http.Client, cfg *Config) (*http.Response, []byte, error) {
+func HTTPReq(method, path string, client *http.Client, cfg *Config) (resp *http.Response, err error) {
 	req, err := http.NewRequest(method, path, nil)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	req.Header.Set("User-Agent", cfg.Agent)
@@ -79,17 +80,19 @@ func HTTPReq(method, path string, client *http.Client, cfg *Config) (*http.Respo
 		}
 	}
 
-	resp, err := client.Do(req)
+	resp, err = client.Do(req)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	buf := &bytes.Buffer{}
-	buf.ReadFrom(resp.Body)
-	body := buf.Bytes()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return resp, err
+	}
+	resp.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
-	return resp, body, err
+	return resp, err
 }
 
 func evaluateURL(wg *sync.WaitGroup, cfg *Config, method string, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
@@ -97,7 +100,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg *Config, method string, urlString strin
 
 	//optimize GET requests by sending a head first (it's cheaper)
 	if method == "GET" && !cfg.NoHead {
-		headResp, _, err := HTTPReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
+		headResp, err := HTTPReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
 		if err != nil {
 			success = false
 			<-workers //done with the net thread
@@ -122,7 +125,8 @@ func evaluateURL(wg *sync.WaitGroup, cfg *Config, method string, urlString strin
 		}
 	}
 
-	headResp, content, err := HTTPReq(method, urlString, client, cfg)
+	headResp, err := HTTPReq(method, urlString, client, cfg)
+	content, _ = ioutil.ReadAll(headResp.Body)
 	<-workers //done with the net thread
 	if err != nil {
 		success = false
@@ -157,12 +161,11 @@ func evaluateURL(wg *sync.WaitGroup, cfg *Config, method string, urlString strin
 	PrintOutput(
 		fmt.Sprintf("Checking body for 404:\nContent: %v,\nSoft404:%v,\nResponse:%v",
 			string(content), string(gState.Hosts.Get404Body(headResp.Request.Host)),
-			detectSoft404(content, gState.Hosts.Get404Body(headResp.Request.Host), cfg.Ratio404)),
+			detectSoft404(headResp, gState.Hosts.Get404(headResp.Request.Host), cfg.Ratio404)),
 		Debug, 4, wg, printChan)
-	if detectSoft404(content, gState.Hosts.Get404Body(headResp.Request.Host), cfg.Ratio404) {
-		success = false
+	if detectSoft404(headResp, gState.Hosts.Get404(headResp.Request.Host), cfg.Ratio404) {
 		//seems to be a soft 404 lol
-		return headResp, content, success
+		return headResp, content, false
 	}
 	return headResp, content, true
 }

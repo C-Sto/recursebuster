@@ -30,7 +30,7 @@ func PrintBanner(cfg *Config) {
 
 //stolen from swarlz
 func printOpts(s *Config) {
-	keys := reflect.ValueOf(&s).Elem()
+	keys := reflect.ValueOf(s).Elem()
 	typeOfT := keys.Type()
 	for i := 0; i < keys.NumField(); i++ {
 		f := keys.Field(i)
@@ -113,7 +113,7 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sy
 
 //UIPrinter is called to write a pretty UI
 func UIPrinter(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
-	tick := time.NewTicker(time.Second * 2)
+	tick := time.NewTicker(time.Second / 30) //30 'fps'
 	testedURL := ""
 	for {
 		select {
@@ -127,42 +127,51 @@ func UIPrinter(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine, testChan
 			//fmt.Fprintln(v, o.Content+"\n")
 
 		case <-tick.C:
-			//time has elapsed the amount of time - it's been 2 seconds
+			writeStatus(testedURL)
+			//refreshUI() //time has elapsed the amount of time - it's been 2 seconds
+			updateUI()
 
 		case t := <-testChan:
 			//URL has been assessed
 			testedURL = t
 		}
-		writeStatus(testedURL)
+
 	}
 }
 
+func updateUI() {
+	gState.ui.Update(func(g *gocui.Gui) error { return nil })
+
+}
+
 func addToMainUI(o OutLine) { //s string) {
-	gState.ui.Update(func(g *gocui.Gui) error {
-		v, err := g.View("Main")
-		if err != nil {
-			return err
-		}
-		fmt.Fprintln(v, o.Type.GetPrefix()+o.Content)
-		return nil
-	})
+	//go gState.ui.Update(func(g *gocui.Gui) error {
+	//g := gState.ui
+	v, err := gState.ui.View("Main")
+	if err != nil {
+		return // err
+	}
+	fmt.Fprintln(v, o.Type.GetPrefix()+o.Content)
+	return // nil
+	//})
 }
 
 func writeStatus(s string) {
-	gState.ui.Update(func(g *gocui.Gui) error {
-		v, err := g.View("Status")
-		if err != nil {
-			return err
-			// handle error
-		}
-		v.Clear()
-		fmt.Fprintln(v, getStatus())
-		sprint := fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(atomic.LoadUint32(gState.WordlistLen)), s)
-		fmt.Fprintln(v, sprint)
-		fmt.Fprintln(v, "ctrl + [(c) quit, (x) stop current dir], (arrow up/down) move one line, (pgup/pgdown) move 10 lines")
-		fmt.Fprintln(v, time.Now().String())
-		return nil
-	})
+	//go gState.ui.Update(func(g *gocui.Gui) error {
+	//g := gState.ui
+	v, err := gState.ui.View("Status")
+	if err != nil {
+		return //err
+		// handle error
+	}
+	v.Clear()
+	fmt.Fprintln(v, getStatus())
+	sprint := fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(len(gState.WordList)), s)
+	fmt.Fprintln(v, sprint)
+	fmt.Fprintln(v, "ctrl + [(c) quit, (x) stop current dir], (arrow up/down) move one line, (pgup/pgdown) move 10 lines")
+	fmt.Fprintln(v, time.Now().String())
+	return //nil
+	//})
 }
 
 //StatusPrinter is the function that performs all the status printing logic
@@ -207,12 +216,12 @@ func StatusPrinter(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine, test
 		if !cfg.NoStatus && cfg.NoUI {
 			//assemble the status string
 			sprint := fmt.Sprintf("%s"+black.Sprint(">"), status)
-			if cfg.MaxDirs == 1 && cfg.Wordlist != "" {
-				//this is the grossest format string I ever did see
-				sprint += fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(atomic.LoadUint32(gState.WordlistLen)), testedURL)
-			} else {
-				sprint += fmt.Sprintf("%s", testedURL)
-			}
+			//if cfg.MaxDirs == 1 && cfg.Wordlist != "" {
+			//this is the grossest format string I ever did see
+			sprint += fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(len(gState.WordList)), testedURL)
+			//} else {
+			//	sprint += fmt.Sprintf("%s", testedURL)
+			//}
 
 			//flush the line
 			fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))

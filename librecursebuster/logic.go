@@ -10,7 +10,7 @@ import (
 )
 
 //ManageRequests handles the request workers
-func ManageRequests(cfg *Config, wg *sync.WaitGroup, pages, newPages, confirmed chan SpiderPage, workers chan struct{}, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
+func ManageRequests(cfg *Config, wg *sync.WaitGroup, pages, newPages, confirmed chan SpiderPage, workers chan struct{}, printChan chan OutLine, testChan chan string) {
 	//manages net request workers
 	for {
 		page := <-pages
@@ -29,11 +29,12 @@ func ManageRequests(cfg *Config, wg *sync.WaitGroup, pages, newPages, confirmed 
 
 				//check for wildcard response
 
-				wg.Add(1)
-				go dirBust(cfg, page, wg, workers, pages, newPages, confirmed, printChan, maxDirs, testChan)
+				//	maxDirs <- struct{}{}
+				dirBust(cfg, page, wg, workers, pages, newPages, confirmed, printChan, testChan)
 			}
 		}
 		wg.Done()
+
 	}
 }
 
@@ -155,9 +156,7 @@ func testURL(cfg *Config, wg *sync.WaitGroup, method string, urlString string, c
 	}
 }
 
-func dirBust(cfg *Config, page SpiderPage, wg *sync.WaitGroup, workers chan struct{}, pages, newPages, confirmed chan SpiderPage, printChan chan OutLine, maxDirs chan struct{}, testChan chan string) {
-	defer wg.Done()
-
+func dirBust(cfg *Config, page SpiderPage, wg *sync.WaitGroup, workers chan struct{}, pages, newPages, confirmed chan SpiderPage, printChan chan OutLine, testChan chan string) {
 	//ugh
 	u, err := url.Parse(page.URL)
 	if err != nil {
@@ -167,10 +166,10 @@ func dirBust(cfg *Config, page SpiderPage, wg *sync.WaitGroup, workers chan stru
 	//check to make sure we aren't dirbusting a wildcardyboi (NOTE!!! USES FIRST SPECIFIED MEHTOD TO DO SOFT 404!)
 	if !cfg.NoWildcardChecks {
 		workers <- struct{}{}
-		_, x, res := evaluateURL(wg, cfg, gState.Methods[0], page.URL+RandString(printChan), gState.Client, workers, printChan)
+		h, _, res := evaluateURL(wg, cfg, gState.Methods[0], page.URL+RandString(printChan), gState.Client, workers, printChan)
 
 		if res { //true response indicates a good response for a guid path, unlikely good
-			if detectSoft404(x, gState.Hosts.Get404Body(u.Host), cfg.Ratio404) {
+			if detectSoft404(h, gState.Hosts.Get404(u.Host), cfg.Ratio404) {
 				//it's a soft404 probably, guess we can continue (this logic seems wrong??)
 			} else {
 				PrintOutput(
@@ -180,27 +179,25 @@ func dirBust(cfg *Config, page SpiderPage, wg *sync.WaitGroup, workers chan stru
 			}
 		}
 	}
-	maxDirs <- struct{}{}
 
 	//load in the wordlist to a channel (can probs be async)
-	wordsChan := make(chan string, 300) //don't expect we will need it much bigger than this
+	//	wordsChan := make(chan string, 300) //don't expect we will need it much bigger than this
 
-	go LoadWords(cfg.Wordlist, wordsChan, printChan) //wordlist management doesn't need waitgroups, because of the following range statement
+	//	go LoadWords(cfg.Wordlist, wordsChan, printChan) //wordlist management doesn't need waitgroups, because of the following range statement
 	if !cfg.NoStartStop {
 		PrintOutput(
 			fmt.Sprintf("Dirbusting %s", page.URL),
 			Info, 0, wg, printChan,
 		)
 	}
-	if cfg.MaxDirs == 1 {
-		atomic.StoreUint32(gState.DirbProgress, 0)
-	}
 
-	for word := range wordsChan { //will receive from the channel until it's closed
+	atomic.StoreUint32(gState.DirbProgress, 0)
+
+	for _, word := range gState.WordList { //will receive from the channel until it's closed
 		//read words off the channel, and test it OR close out because we wanna skip it
 		select {
 		case <-gState.StopDir:
-			<-maxDirs
+			//<-maxDirs
 			if !cfg.NoStartStop {
 				PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0, wg, printChan)
 			}
@@ -224,13 +221,13 @@ func dirBust(cfg *Config, page SpiderPage, wg *sync.WaitGroup, workers chan stru
 				wg.Add(1)
 				go testURL(cfg, wg, method, page.URL+word, gState.Client, newPages, workers, confirmed, printChan, testChan)
 
-				if cfg.MaxDirs == 1 {
-					atomic.AddUint32(gState.DirbProgress, 1)
-				}
+				//if cfg.MaxDirs == 1 {
+				atomic.AddUint32(gState.DirbProgress, 1)
+				//}
 			}
 		}
 	}
-	<-maxDirs
+	//<-maxDirs
 	if !cfg.NoStartStop {
 		PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0, wg, printChan)
 	}
