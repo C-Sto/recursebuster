@@ -8,6 +8,7 @@ import (
 	ui "github.com/jroimartin/gocui"
 )
 
+//StartUI is called to begin the UI... stuff
 func (s *State) StartUI(wg *sync.WaitGroup, quitChan chan struct{}) {
 	g, err := ui.NewGui(ui.OutputNormal)
 
@@ -106,31 +107,31 @@ func layout(g *ui.Gui) error {
 //https://github.com/mephux/komanda-cli/blob/4b3c83ae8946d6eaf607d6d74158ff4a06343009/komanda/util.go
 func scrollUp(g *ui.Gui, cv *ui.View) error {
 	v, _ := g.View("Main")
-	ScrollView(v, g, -1)
+	scrollView(v, g, -1)
 	return nil
 }
 
 // ScrollDown view by one
 func scrollDown(g *ui.Gui, cv *ui.View) error {
 	v, _ := g.View("Main")
-	ScrollView(v, g, 1)
+	scrollView(v, g, 1)
 	return nil
 }
 
 func pgUp(g *ui.Gui, cv *ui.View) error {
 	v, _ := g.View("Main")
-	ScrollView(v, g, -10)
+	scrollView(v, g, -10)
 	return nil
 }
 
 // ScrollDown view by one
 func pgDown(g *ui.Gui, cv *ui.View) error {
 	v, _ := g.View("Main")
-	ScrollView(v, g, 10)
+	scrollView(v, g, 10)
 	return nil
 }
 
-func ScrollView(v *ui.View, g *ui.Gui, dy int) {
+func scrollView(v *ui.View, g *ui.Gui, dy int) {
 	// Grab the view that we want to scroll.
 	// Get the size and position of the view.
 	_, y := v.Size()

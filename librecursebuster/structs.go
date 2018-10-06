@@ -83,6 +83,7 @@ type OutLine struct {
 
 var gState *State
 
+//SetState will assign the global state object
 func SetState(s *State) {
 	gState = s
 }
