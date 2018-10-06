@@ -2,6 +2,8 @@
 
 [![Go Basic Checks](https://goreportcard.com/badge/github.com/c-sto/recursebuster)](https://goreportcard.com/report/github.com/c-sto/recursebuster)
 
+![alt-text](screen.gif "Test")
+
 It's like gobuster, but recursive!
 
 I wanted a recursive directory brute forcer that was fast, and had certain features. It didn't exist, so I started writing this. In reality, I'll probably merge a lot of the functionality into github.com/swarley7/gograbber since that solves a similar problem and has cool features that I don't want to implement (phantomjs, ugh). For now, here it be!
@@ -15,6 +17,14 @@ go get -u github.com/c-sto/recursebuster
 ```
 
 Important releases will also be tagged and uploaded.
+
+**NOTE** Since tagged releases have started, some old versions which have been obtained with `go get -u` seem to be broken. Removing the folder and starting again seems to work:
+
+```
+rm -rf $GOPATH/src/github.com/c-sto/recursebuster
+rm $GOPATH/bin/recursebuster
+go get -u github.com/c-sto/recursebuster
+```
 
 ## Usage
 
