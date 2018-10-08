@@ -20,7 +20,7 @@ func ManageRequests(cfg *Config, wg *sync.WaitGroup, pages, newPages, confirmed 
 			continue
 		}
 		for _, method := range gState.Methods {
-			if !cfg.NoBase {
+			if page.Result == nil && !cfg.NoBase {
 				workers <- struct{}{}
 				wg.Add(1)
 				go testURL(cfg, wg, method, page.URL, gState.Client, newPages, workers, confirmed, printChan, testChan)
@@ -68,7 +68,7 @@ func ManageNewURLs(cfg *Config, wg *sync.WaitGroup, pages, newpages chan SpiderP
 			gState.Checked[actualURL] = true
 			gState.CMut.Unlock()
 			wg.Add(1)
-			pages <- SpiderPage{URL: actualURL, Reference: candidate.Reference}
+			pages <- SpiderPage{URL: actualURL, Reference: candidate.Reference, Result: candidate.Result}
 			PrintOutput("URL Added: "+actualURL, Debug, 3, wg, printChan)
 
 			//also add any directories in the supplied path to the 'to be hacked' queue
@@ -89,6 +89,7 @@ func ManageNewURLs(cfg *Config, wg *sync.WaitGroup, pages, newpages chan SpiderP
 				newPage := SpiderPage{}
 				newPage.URL = newDir
 				newPage.Reference = candidate.Reference
+				newPage.Result = candidate.Result
 				gState.CMut.RLock()
 				if gState.Checked[newDir] {
 					gState.CMut.RUnlock()
@@ -113,12 +114,10 @@ func testURL(cfg *Config, wg *sync.WaitGroup, method string, urlString string, c
 		wg.Done()
 		atomic.AddUint64(gState.TotalTested, 1)
 	}()
-
 	select {
 	case testChan <- method + ":" + urlString:
 	default: //this is to prevent blocking, it doesn't _really_ matter if it doesn't get written to output
 	}
-
 	headResp, content, good := evaluateURL(wg, cfg, method, urlString, client, workers, printChan)
 
 	if !good && !cfg.ShowAll {
@@ -128,7 +127,7 @@ func testURL(cfg *Config, wg *sync.WaitGroup, method string, urlString string, c
 	//inception (but also check if the directory version is good, and add that to the queue too)
 	if string(urlString[len(urlString)-1]) != "/" && good {
 		wg.Add(1)
-		newPages <- SpiderPage{URL: urlString + "/", Reference: headResp.Request.URL}
+		newPages <- SpiderPage{URL: urlString + "/", Reference: headResp.Request.URL, Result: headResp}
 	}
 
 	wg.Add(1)
@@ -180,10 +179,6 @@ func dirBust(cfg *Config, page SpiderPage, wg *sync.WaitGroup, workers chan stru
 		}
 	}
 
-	//load in the wordlist to a channel (can probs be async)
-	//	wordsChan := make(chan string, 300) //don't expect we will need it much bigger than this
-
-	//	go LoadWords(cfg.Wordlist, wordsChan, printChan) //wordlist management doesn't need waitgroups, because of the following range statement
 	if !cfg.NoStartStop {
 		PrintOutput(
 			fmt.Sprintf("Dirbusting %s", page.URL),
@@ -193,8 +188,13 @@ func dirBust(cfg *Config, page SpiderPage, wg *sync.WaitGroup, workers chan stru
 
 	atomic.StoreUint32(gState.DirbProgress, 0)
 
+	tested := make(map[string]bool)        //ensure we don't send things more than once
 	for _, word := range gState.WordList { //will receive from the channel until it's closed
 		//read words off the channel, and test it OR close out because we wanna skip it
+		if word == "" {
+			atomic.AddUint32(gState.DirbProgress, 1)
+			continue
+		}
 		select {
 		case <-gState.StopDir:
 			//<-maxDirs
@@ -207,20 +207,31 @@ func dirBust(cfg *Config, page SpiderPage, wg *sync.WaitGroup, workers chan stru
 
 				if len(gState.Extensions) > 0 && gState.Extensions[0] != "" {
 					for _, ext := range gState.Extensions {
+						if tested[page.URL+word+"."+ext] {
+							continue
+						}
 						workers <- struct{}{}
 						wg.Add(1)
 						go testURL(cfg, wg, method, page.URL+word+"."+ext, gState.Client, newPages, workers, confirmed, printChan, testChan)
+						tested[page.URL+word+"."+ext] = true
 					}
 				}
 				if cfg.AppendDir {
+					if tested[page.URL+word+"/"] {
+						continue
+					}
 					workers <- struct{}{}
 					wg.Add(1)
 					go testURL(cfg, wg, method, page.URL+word+"/", gState.Client, newPages, workers, confirmed, printChan, testChan)
+					tested[page.URL+word+"/"] = true
+				}
+				if tested[page.URL+word] {
+					continue
 				}
 				workers <- struct{}{}
 				wg.Add(1)
 				go testURL(cfg, wg, method, page.URL+word, gState.Client, newPages, workers, confirmed, printChan, testChan)
-
+				tested[page.URL+word] = true
 				//if cfg.MaxDirs == 1 {
 				atomic.AddUint32(gState.DirbProgress, 1)
 				//}

@@ -97,7 +97,8 @@ func HTTPReq(method, path string, client *http.Client, cfg *Config) (resp *http.
 
 func evaluateURL(wg *sync.WaitGroup, cfg *Config, method string, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
 	success = true
-
+	//wg.Add(1)
+	//PrintOutput("EVALUATING:"+method+":"+urlString, Debug, 4, wg, printChan)
 	//optimize GET requests by sending a head first (it's cheaper)
 	if method == "GET" && !cfg.NoHead {
 		headResp, err := HTTPReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response

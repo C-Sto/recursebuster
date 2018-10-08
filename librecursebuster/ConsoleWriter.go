@@ -111,7 +111,7 @@ func (c *ConsoleWriter) Fprintf(w io.Writer, format string, a ...interface{}) (n
 	defer c.mu.Unlock()
 	c.buf = c.buf[:0]
 	c.formatHeader(&c.buf, now, file, line)
-	c.buf = append(c.buf, fmt.Sprintf(format, a)...)
+	c.buf = append(c.buf, fmt.Sprintf(format, a...)...)
 	n, err = w.Write(c.buf)
 	return
 }

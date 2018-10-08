@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 /*wordlist
@@ -49,6 +50,16 @@ const bod404mod = `404 not found 20/20/20`
 const bod200 = `200ish response! This should be different enough that it is not detected as being a soft 404, ideally anyway.`
 
 func handler(w http.ResponseWriter, r *http.Request) {
+
+	vMut.Lock()
+	//if it's been visited more than once, instant fail
+	if visited[r.Method+":"+r.URL.Path] && r.URL.Path != "/" {
+		//we can visit the base url more than once
+		panic("Path visited more than once: " + r.Method + ":" + r.URL.Path)
+	}
+	visited[r.Method+":"+r.URL.Path] = true
+	vMut.Unlock()
+
 	respCode := 404
 
 	switch strings.ToLower(r.URL.Path) {
@@ -121,14 +132,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}*/
 }
 
-/*
-func main() {
-	http.HandleFunc("/", handler)
-	http.ListenAndServe(":8080", nil)
-}
-*/
-
 func Start() {
+	visited = make(map[string]bool)
+	vMut = &sync.RWMutex{}
 	http.HandleFunc("/", handler)
 	go http.ListenAndServe("127.0.0.1:12345", nil)
 }
+
+var visited map[string]bool
+var vMut *sync.RWMutex
