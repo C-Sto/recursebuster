@@ -2,13 +2,11 @@ package librecursebuster
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -17,15 +15,10 @@ import (
 
 func TestBasicFunctionality(t *testing.T) {
 
-	wg := &sync.WaitGroup{}
 	cfg := &Config{}
 
 	//the state should probably change per different host.. eventually
-	globalState := &State{
-		BadResponses: make(map[int]bool),
-		Whitelist:    make(map[string]bool),
-		Blacklist:    make(map[string]bool),
-	}
+	globalState := State{}.Init()
 	globalState.Hosts.Init()
 
 	cfg.Version = "TEST"
@@ -57,7 +50,7 @@ func TestBasicFunctionality(t *testing.T) {
 	cfg.NoStatus = false
 	cfg.NoStartStop = false
 	cfg.NoWildcardChecks = false
-	cfg.NoUI = false
+	cfg.NoUI = true
 	cfg.Localpath = "." + string(os.PathSeparator) + "busted.txt"
 	cfg.Methods = "GET"
 	cfg.ProxyAddr = ""
@@ -91,7 +84,7 @@ z
 
 	setupConfig(cfg, globalState, urlSlice[0], printChan)
 
-	setupState(globalState, cfg, wg, printChan)
+	setupState(globalState, cfg, printChan)
 
 	//setup channels
 	pages := make(chan SpiderPage, 1000)
@@ -110,8 +103,8 @@ z
 
 	cfg.Wordlist = "test"
 
-	go ManageNewURLs(cfg, wg, pages, newPages, printChan)
-	go ManageRequests(cfg, wg, pages, newPages, confirmed, workers, printChan, testChan)
+	go ManageRequests(cfg, pages, newPages, confirmed, workers, printChan, testChan)
+	go ManageNewURLs(cfg, pages, newPages, printChan)
 
 	u, err := url.Parse(urlSlice[0])
 	if err != nil {
@@ -123,13 +116,14 @@ z
 		prefix = prefix + "/"
 	}
 	randURL := fmt.Sprintf("%s%s", prefix, cfg.Canary)
-	wg.Add(1)
+	globalState.AddWG()
 	workers <- struct{}{}
-	go startBusting(wg, globalState, cfg, workers, printChan, pages, randURL, *u)
+	go StartBusting(cfg, workers, printChan, pages, randURL, *u)
 
 	go func() {
 		for {
 			p := <-printChan
+			globalState.wg.Done()
 			if p.Level > 1 {
 				continue
 			}
@@ -138,49 +132,60 @@ z
 	}()
 	found := make(map[string]bool)
 	go func() {
-		for x := range confirmed {
-			found[x.URL] = true
-			fmt.Println("CONFIRMED!", x)
+		t := time.NewTicker(1 * time.Second).C
+		for {
+			select {
+			case x := <-confirmed:
+				globalState.wg.Done()
+				u, e := url.Parse(x.URL)
+				if e != nil {
+					panic(e)
+				}
+				found[u.Path] = true
+				fmt.Println("CONFIRMED!", x)
+			case <-t:
+				fmt.Println(globalState.wg)
+			}
 		}
 	}()
 	//waitgroup check (if test times out, the waitgroup is broken... somewhere)
-	wg.Wait()
+	globalState.Wait()
 
+	fmt.Println("Ready to test!")
 	//check for each specific line that should be in there..
-	/*
-			200 (OK)
-		/a
-		/a/b
-		/a/b/c
-		/a/
-		/a/x (200, but same body as /x (404))
-		/a/y (200, but very similar body to /x (404))
-	*/
-	// /
-	for _, i := range strings.Split(wordlist, "\n") {
+	ok200 := []string{
+		"/a", "/a/b", "/a/b/c", "/a/",
+	}
+	for _, i := range ok200 {
 		if x, ok := found[i]; !ok || !x {
 			panic("Did not find " + i)
 		}
 	}
-	// /a
-	/*
-	   300
-	   /b -> /a/ (302)
-	   /b/c -> /a/b (301)
-	   /b/c/ -> /a/b/c (302)
-	   /b/x (302, but same body as /x (404))
-	   /b/y (301, but very similar body to /x (404))
+	ok300 := []string{
+		"/b", "/b/c",
+	}
+	for _, i := range ok300 {
+		if x, ok := found[i]; !ok || !x {
+			panic("Did not find " + i)
+		}
+	}
+	ok400 := []string{
+		"/a/b/c/", "/a/b/c/d",
+	}
+	for _, i := range ok400 {
+		if x, ok := found[i]; !ok || !x {
+			panic("Did not find " + i)
+		}
+	}
+	ok500 := []string{
+		"/c/d", "/c", "/c/",
+	}
+	for _, i := range ok500 {
+		if x, ok := found[i]; !ok || !x {
+			panic("Did not find " + i)
+		}
+	}
 
-	   400
-	   /x (404)
-	   /a/b/c/ (401)
-	   /a/b/c/d (403)
-
-	   500
-	   /c/d
-	   /c/
-	*/
-	panic("no")
 }
 
 func setupConfig(cfg *Config, globalState *State, urlSliceZero string, printChan chan OutLine) {
@@ -231,12 +236,10 @@ func setupState(globalState *State, cfg *Config, printChan chan OutLine) {
 		}
 		globalState.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
 	}
-	globalState.Client = ConfigureHTTPClient(cfg, wg, printChan, false)
-	globalState.BurpClient = ConfigureHTTPClient(cfg, wg, printChan, true)
 
-	globalState.StopDir = make(chan struct{}, 1)
-	globalState.CMut = &sync.RWMutex{}
-	globalState.Checked = make(map[string]bool)
+	globalState.Client = ConfigureHTTPClient(cfg, printChan, false)
+	globalState.BurpClient = ConfigureHTTPClient(cfg, printChan, true)
+
 	globalState.Version = cfg.Version
 
 	if cfg.BlacklistLocation != "" {
@@ -255,67 +258,20 @@ func setupState(globalState *State, cfg *Config, printChan chan OutLine) {
 		}
 	}
 
+	// && cfg.MaxDirs == 1 {
+
 	zerod := uint32(0)
 	globalState.DirbProgress = &zerod
 
+	//	zero := uint32(0)
+	//	globalState.WordlistLen = &zero
+
 	SetState(globalState)
 }
-
 func getURLSlice(cfg *Config, printChan chan OutLine) []string {
 	urlSlice := []string{}
 	if cfg.URL != "" {
 		urlSlice = append(urlSlice, cfg.URL)
 	}
 	return urlSlice
-}
-
-func startBusting(globalState *State, cfg *Config, workers chan struct{}, printChan chan OutLine, pages chan SpiderPage, randURL string, u url.URL) {
-	defer wg.Done()
-	if !cfg.NoWildcardChecks {
-		resp, err := HTTPReq("GET", randURL, globalState.Client, cfg)
-		<-workers
-		if err != nil {
-			if cfg.InputList != "" {
-				PrintOutput(
-					err.Error(),
-					Error,
-					0,
-					wg,
-					printChan,
-				)
-				return
-			}
-			panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
-
-		}
-		PrintOutput(
-			fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
-			Debug, 2, wg, printChan,
-		)
-		content, _ := ioutil.ReadAll(resp.Body)
-		globalState.Hosts.AddSoft404Content(u.Host, content, resp) // Soft404ResponseBody = xx
-	} else {
-		<-workers
-	}
-	x := SpiderPage{}
-	x.URL = u.String()
-	x.Reference = &u
-
-	globalState.CMut.Lock()
-	defer globalState.CMut.Unlock()
-	if ok := globalState.Checked[u.String()+"/"]; !strings.HasSuffix(u.String(), "/") && !ok {
-		wg.Add(1)
-		pages <- SpiderPage{
-			URL:       u.String() + "/",
-			Reference: &u,
-		}
-		globalState.Checked[u.String()+"/"] = true
-		PrintOutput("URL Added: "+u.String()+"/", Debug, 3, wg, printChan)
-	}
-	if ok := globalState.Checked[x.URL]; !ok {
-		wg.Add(1)
-		pages <- x
-		globalState.Checked[x.URL] = true
-		PrintOutput("URL Added: "+x.URL, Debug, 3, wg, printChan)
-	}
 }

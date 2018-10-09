@@ -41,7 +41,7 @@ y
 
 500
 /c/d
-/c/
+/c
 
 */
 
@@ -96,6 +96,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	case "/a/b/c/d":
 		respCode = 403
 	case "/c":
+		fallthrough
+	case "/c/":
 		respCode = 500
 	case "/c/d":
 		respCode = 666
