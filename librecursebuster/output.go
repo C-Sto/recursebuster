@@ -166,7 +166,10 @@ func writeStatus(s string) {
 	}
 	v.Clear()
 	fmt.Fprintln(v, getStatus())
-	sprint := fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(len(gState.WordList)), s)
+	sprint := ""
+	if len(gState.WordList) > 0 {
+		sprint = fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(len(gState.WordList)), s)
+	}
 	fmt.Fprintln(v, sprint)
 	fmt.Fprintln(v, "ctrl + [(c) quit, (x) stop current dir], (arrow up/down) move one line, (pgup/pgdown) move 10 lines")
 	fmt.Fprintln(v, time.Now().String())

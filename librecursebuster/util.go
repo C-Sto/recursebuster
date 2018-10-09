@@ -47,23 +47,24 @@ func getUrls(page []byte, printChan chan OutLine) ([]string, error) {
 
 func detectSoft404(r1 *http.Response, r2 *http.Response, ratio float64) bool {
 	//a, b := []byte{}
-
-	if r1.ContentLength > 0 && r2.ContentLength > 0 &&
-		r1.StatusCode == r2.StatusCode {
-		a, e := ioutil.ReadAll(r1.Body)
-		if e != nil {
-			panic(e)
-		}
-		b, e := ioutil.ReadAll(r2.Body)
-		if e != nil {
-			panic(e)
-		}
-		dist := float64(levenshteinDistance(a, b))
-		longer := math.Max(float64(len(a)), float64(len(b)))
-		perc := (longer - dist) / longer
-		if perc > ratio {
-			//if diff.QuickRatio() > ratio {
-			return true
+	if r1 != nil && r2 != nil {
+		if r1.ContentLength > 0 && r2.ContentLength > 0 &&
+			r1.StatusCode == r2.StatusCode {
+			a, e := ioutil.ReadAll(r1.Body)
+			if e != nil {
+				panic(e)
+			}
+			b, e := ioutil.ReadAll(r2.Body)
+			if e != nil {
+				panic(e)
+			}
+			dist := float64(levenshteinDistance(a, b))
+			longer := math.Max(float64(len(a)), float64(len(b)))
+			perc := (longer - dist) / longer
+			if perc > ratio {
+				//if diff.QuickRatio() > ratio {
+				return true
+			}
 		}
 	}
 	return false
