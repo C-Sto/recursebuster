@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,7 +18,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.5.5"
+const version = "1.5.6"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -29,15 +28,10 @@ func main() {
 		librecursebuster.InitLogger(os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stderr)
 	}
 
-	wg := &sync.WaitGroup{}
 	cfg := &librecursebuster.Config{}
 
 	//the state should probably change per different host.. eventually
-	globalState := &librecursebuster.State{
-		BadResponses: make(map[int]bool),
-		Whitelist:    make(map[string]bool),
-		Blacklist:    make(map[string]bool),
-	}
+	globalState := librecursebuster.State{}.Init()
 	globalState.Hosts.Init()
 
 	cfg.Version = version
@@ -103,7 +97,7 @@ func main() {
 
 	setupConfig(cfg, globalState, urlSlice[0], printChan)
 
-	setupState(globalState, cfg, wg, printChan)
+	setupState(globalState, cfg, printChan)
 
 	//setup channels
 	pages := make(chan librecursebuster.SpiderPage, 1000)
@@ -126,18 +120,19 @@ func main() {
 		go globalState.StartUI(uiWG, quitChan)
 		uiWG.Wait()
 	}
-	librecursebuster.PrintBanner(cfg)
+
 	if cfg.NoUI {
-		go librecursebuster.StatusPrinter(cfg, wg, printChan, testChan)
+		librecursebuster.PrintBanner(cfg)
+		go librecursebuster.StatusPrinter(cfg, printChan, testChan)
 	} else {
-		go librecursebuster.UIPrinter(cfg, wg, printChan, testChan)
+		go librecursebuster.UIPrinter(cfg, printChan, testChan)
 	}
-	go librecursebuster.ManageRequests(cfg, wg, pages, newPages, confirmed, workers, printChan, testChan)
-	go librecursebuster.ManageNewURLs(cfg, wg, pages, newPages, printChan)
-	go librecursebuster.OutputWriter(wg, cfg, confirmed, cfg.Localpath, printChan)
+	go librecursebuster.ManageRequests(cfg, pages, newPages, confirmed, workers, printChan, testChan)
+	go librecursebuster.ManageNewURLs(cfg, pages, newPages, printChan)
+	go librecursebuster.OutputWriter(cfg, confirmed, cfg.Localpath, printChan)
 	go librecursebuster.StatsTracker()
 
-	librecursebuster.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0, wg, printChan)
+	librecursebuster.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0, printChan)
 
 	//seed the workers
 	for _, s := range urlSlice {
@@ -165,15 +160,14 @@ func main() {
 			prefix = prefix + "/"
 		}
 		randURL := fmt.Sprintf("%s%s", prefix, cfg.Canary)
-		wg.Add(1)
 		workers <- struct{}{}
-		go startBusting(wg, globalState, cfg, workers, printChan, pages, randURL, *u)
+		globalState.AddWG()
+		go librecursebuster.StartBusting(cfg, workers, printChan, pages, randURL, *u)
 
 	}
 
 	//wait for completion
-	wg.Wait()
-	librecursebuster.StopUI()
+	globalState.Wait()
 
 }
 
@@ -206,7 +200,7 @@ func uiQuit(quitChan chan struct{}) {
 	os.Exit(0)
 }
 
-func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Config, wg *sync.WaitGroup, printChan chan librecursebuster.OutLine) {
+func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Config, printChan chan librecursebuster.OutLine) {
 	for _, x := range strings.Split(cfg.Extensions, ",") {
 		globalState.Extensions = append(globalState.Extensions, x)
 	}
@@ -223,12 +217,9 @@ func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Confi
 		globalState.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
 	}
 
-	globalState.Client = librecursebuster.ConfigureHTTPClient(cfg, wg, printChan, false)
-	globalState.BurpClient = librecursebuster.ConfigureHTTPClient(cfg, wg, printChan, true)
+	globalState.Client = librecursebuster.ConfigureHTTPClient(cfg, printChan, false)
+	globalState.BurpClient = librecursebuster.ConfigureHTTPClient(cfg, printChan, true)
 
-	globalState.StopDir = make(chan struct{}, 1)
-	globalState.CMut = &sync.RWMutex{}
-	globalState.Checked = make(map[string]bool)
 	globalState.Version = cfg.Version
 
 	if cfg.BlacklistLocation != "" {
@@ -295,55 +286,4 @@ func setupConfig(cfg *librecursebuster.Config, globalState *librecursebuster.Sta
 		cfg.Canary = librecursebuster.RandString(printChan)
 	}
 
-}
-
-func startBusting(wg *sync.WaitGroup, globalState *librecursebuster.State, cfg *librecursebuster.Config, workers chan struct{}, printChan chan librecursebuster.OutLine, pages chan librecursebuster.SpiderPage, randURL string, u url.URL) {
-	defer wg.Done()
-	if !cfg.NoWildcardChecks {
-		resp, err := librecursebuster.HTTPReq("GET", randURL, globalState.Client, cfg)
-		<-workers
-		if err != nil {
-			if cfg.InputList != "" {
-				librecursebuster.PrintOutput(
-					err.Error(),
-					librecursebuster.Error,
-					0,
-					wg,
-					printChan,
-				)
-				return
-			}
-			panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
-
-		}
-		librecursebuster.PrintOutput(
-			fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
-			librecursebuster.Debug, 2, wg, printChan,
-		)
-		content, _ := ioutil.ReadAll(resp.Body)
-		globalState.Hosts.AddSoft404Content(u.Host, content, resp) // Soft404ResponseBody = xx
-	} else {
-		<-workers
-	}
-	x := librecursebuster.SpiderPage{}
-	x.URL = u.String()
-	x.Reference = &u
-
-	globalState.CMut.Lock()
-	defer globalState.CMut.Unlock()
-	if ok := globalState.Checked[u.String()+"/"]; !strings.HasSuffix(u.String(), "/") && !ok {
-		wg.Add(1)
-		pages <- librecursebuster.SpiderPage{
-			URL:       u.String() + "/",
-			Reference: &u,
-		}
-		globalState.Checked[u.String()+"/"] = true
-		librecursebuster.PrintOutput("URL Added: "+u.String()+"/", librecursebuster.Debug, 3, wg, printChan)
-	}
-	if ok := globalState.Checked[x.URL]; !ok {
-		wg.Add(1)
-		pages <- x
-		globalState.Checked[x.URL] = true
-		librecursebuster.PrintOutput("URL Added: "+x.URL, librecursebuster.Debug, 3, wg, printChan)
-	}
 }

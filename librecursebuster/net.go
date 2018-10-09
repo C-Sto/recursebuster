@@ -9,14 +9,13 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/net/proxy"
 )
 
 //ConfigureHTTPClient configures and returns a HTTP Client (mostly useful to be able to send to burp)
-func ConfigureHTTPClient(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine, sendToBurpOnly bool) *http.Client {
+func ConfigureHTTPClient(cfg *Config, printChan chan OutLine, sendToBurpOnly bool) *http.Client {
 
 	httpTransport := &http.Transport{MaxIdleConns: 100}
 	client := &http.Client{Transport: httpTransport, Timeout: time.Duration(cfg.Timeout) * time.Second}
@@ -48,7 +47,7 @@ func ConfigureHTTPClient(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine
 		}
 		if !sendToBurpOnly {
 			//send the set proxy status (don't need this for burp requests)
-			PrintOutput(fmt.Sprintf("Proxy set to: %s", cfg.ProxyAddr), Info, 0, wg, printChan)
+			PrintOutput(fmt.Sprintf("Proxy set to: %s", cfg.ProxyAddr), Info, 0, printChan)
 		}
 	}
 
@@ -95,7 +94,7 @@ func HTTPReq(method, path string, client *http.Client, cfg *Config) (resp *http.
 	return resp, err
 }
 
-func evaluateURL(wg *sync.WaitGroup, cfg *Config, method string, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
+func evaluateURL(cfg *Config, method string, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
 	success = true
 	//wg.Add(1)
 	//PrintOutput("EVALUATING:"+method+":"+urlString, Debug, 4, wg, printChan)
@@ -105,7 +104,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg *Config, method string, urlString strin
 		if err != nil {
 			success = false
 			<-workers //done with the net thread
-			PrintOutput(fmt.Sprintf("%s", err), Error, 0, wg, printChan)
+			PrintOutput(fmt.Sprintf("%s", err), Error, 0, printChan)
 			return headResp, content, success
 		}
 
@@ -131,7 +130,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg *Config, method string, urlString strin
 	<-workers //done with the net thread
 	if err != nil {
 		success = false
-		PrintOutput(fmt.Sprintf("%s", err), Error, 0, wg, printChan)
+		PrintOutput(fmt.Sprintf("%s", err), Error, 0, printChan)
 
 		return headResp, content, success
 	}
@@ -163,7 +162,7 @@ func evaluateURL(wg *sync.WaitGroup, cfg *Config, method string, urlString strin
 		fmt.Sprintf("Checking body for 404:\nContent: %v,\nSoft404:%v,\nResponse:%v",
 			string(content), string(gState.Hosts.Get404Body(headResp.Request.Host)),
 			detectSoft404(headResp, gState.Hosts.Get404(headResp.Request.Host), cfg.Ratio404)),
-		Debug, 4, wg, printChan)
+		Debug, 4, printChan)
 	if detectSoft404(headResp, gState.Hosts.Get404(headResp.Request.Host), cfg.Ratio404) {
 		//seems to be a soft 404 lol
 		return headResp, content, false

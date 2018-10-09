@@ -9,7 +9,7 @@ import (
 )
 
 //StartUI is called to begin the UI... stuff
-func (s *State) StartUI(wg *sync.WaitGroup, quitChan chan struct{}) {
+func (s *State) StartUI(uiWG *sync.WaitGroup, quitChan chan struct{}) {
 	g, err := ui.NewGui(ui.OutputNormal)
 	g.Mouse = true
 	if err != nil {
@@ -17,10 +17,7 @@ func (s *State) StartUI(wg *sync.WaitGroup, quitChan chan struct{}) {
 	}
 	s.ui = g
 	defer func() {
-		p, _ := s.ui.View("Main")
-		lines := p.ViewBuffer()
-		s.ui.Close()
-		fmt.Print(lines)
+		StopUI()
 		close(quitChan)
 	}()
 	s.ui.SetManagerFunc(layout)
@@ -59,16 +56,18 @@ func (s *State) StartUI(wg *sync.WaitGroup, quitChan chan struct{}) {
 	if err != nil {
 		panic(err)
 	}
-	wg.Done()
+	uiWG.Done()
 	err = s.ui.MainLoop()
 	if err != nil && err != ui.ErrQuit {
 		panic(err)
 	}
-
 }
 
 func StopUI() {
-	quit(gState.ui, nil)
+	p, _ := gState.ui.View("Main")
+	lines := p.ViewBuffer()
+	gState.ui.Close()
+	fmt.Print(lines)
 }
 
 func handleX(g *ui.Gui, v *ui.View) error {
@@ -89,7 +88,6 @@ func quit(g *ui.Gui, v *ui.View) error {
 
 func layout(g *ui.Gui) error {
 	mX, mY := g.Size()
-
 	v, err := g.SetView("Main", 0, 0, mX-1, mY-7)
 	if err != nil && err != ui.ErrUnknownView {
 		return err

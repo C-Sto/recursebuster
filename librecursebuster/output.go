@@ -5,7 +5,6 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -40,7 +39,7 @@ func printOpts(s *Config) {
 }
 
 //OutputWriter will write to a file and the screen
-func OutputWriter(wg *sync.WaitGroup, cfg *Config, confirmed chan SpiderPage, localPath string, printChan chan OutLine) {
+func OutputWriter(cfg *Config, confirmed chan SpiderPage, localPath string, printChan chan OutLine) {
 	//output worker
 	pages := make(map[string]bool) //keep it unique
 	file, err := os.OpenFile(localPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
@@ -80,30 +79,31 @@ func OutputWriter(wg *sync.WaitGroup, cfg *Config, confirmed chan SpiderPage, lo
 			file.WriteString(writeS + "\n")
 			file.Sync()
 
-			printBasedOnStatus(object.Result.StatusCode, printS, wg, printChan)
+			printBasedOnStatus(object.Result.StatusCode, printS, printChan)
 		}
-		wg.Done()
+		gState.wg.Done()
+		//wg.Done()
 	}
 }
 
-func printBasedOnStatus(status int, printS string, wg *sync.WaitGroup, printChan chan OutLine) {
+func printBasedOnStatus(status int, printS string, printChan chan OutLine) {
 	x := status
 	if 199 < x && x < 300 { //2xx
-		PrintOutput(printS, Good2, 0, wg, printChan)
+		PrintOutput(printS, Good2, 0, printChan)
 	} else if 299 < x && x < 400 { //3xx
-		PrintOutput(printS, Good3, 0, wg, printChan)
+		PrintOutput(printS, Good3, 0, printChan)
 	} else if 399 < x && x < 500 { //4xx
-		PrintOutput(printS, Good4, 0, wg, printChan)
+		PrintOutput(printS, Good4, 0, printChan)
 	} else if 499 < x && x < 600 { //5xx
-		PrintOutput(printS, Good5, 0, wg, printChan)
+		PrintOutput(printS, Good5, 0, printChan)
 	} else {
-		PrintOutput(printS, Goodx, 0, wg, printChan)
+		PrintOutput(printS, Goodx, 0, printChan)
 	}
 }
 
 //PrintOutput used to send output to the screen
-func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sync.WaitGroup, printChan chan OutLine) {
-	wg.Add(1)
+func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, printChan chan OutLine) {
+	gState.wg.Add(1)
 	printChan <- OutLine{
 		Content: message,
 		Type:    writer,
@@ -112,7 +112,7 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, wg *sy
 }
 
 //UIPrinter is called to write a pretty UI
-func UIPrinter(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
+func UIPrinter(cfg *Config, printChan chan OutLine, testChan chan string) {
 	tick := time.NewTicker(time.Second / 30) //30 'fps'
 	testedURL := ""
 	for {
@@ -123,6 +123,7 @@ func UIPrinter(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine, testChan
 			if cfg.VerboseLevel >= o.Level {
 				addToMainUI(o)
 			}
+			gState.wg.Done()
 			//gState.ui.Update()
 			//fmt.Fprintln(v, o.Content+"\n")
 
@@ -169,6 +170,8 @@ func writeStatus(s string) {
 	sprint := ""
 	if len(gState.WordList) > 0 {
 		sprint = fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(len(gState.WordList)), s)
+	} else {
+		sprint = fmt.Sprintf("Waiting on %v items", gState.wg)
 	}
 	fmt.Fprintln(v, sprint)
 	fmt.Fprintln(v, "ctrl + [(c) quit, (x) stop current dir], (arrow up/down) move one line, (pgup/pgdown) move 10 lines")
@@ -178,7 +181,7 @@ func writeStatus(s string) {
 }
 
 //StatusPrinter is the function that performs all the status printing logic
-func StatusPrinter(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine, testChan chan string) {
+func StatusPrinter(cfg *Config, printChan chan OutLine, testChan chan string) {
 	tick := time.NewTicker(time.Second * 2)
 	status := getStatus()
 	spacesToClear := 0
@@ -202,11 +205,9 @@ func StatusPrinter(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine, test
 						panic(err)
 					}
 					fmt.Fprintln(v, o.Content+"\n")
-					//v.Write([]byte(o.Content))
-					//o.Type.Fprintf(v, o.Content, nil...)
 				}
 			}
-			wg.Done()
+			gState.wg.Done()
 
 		case <-tick.C: //time has elapsed the amount of time - it's been 2 seconds
 			status = getStatus()
@@ -221,7 +222,9 @@ func StatusPrinter(cfg *Config, wg *sync.WaitGroup, printChan chan OutLine, test
 			sprint := fmt.Sprintf("%s"+black.Sprint(">"), status)
 			//if cfg.MaxDirs == 1 && cfg.Wordlist != "" {
 			//this is the grossest format string I ever did see
-			sprint += fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(len(gState.WordList)), testedURL)
+			if len(gState.WordList) > 0 {
+				sprint += fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(len(gState.WordList)), testedURL)
+			}
 			//} else {
 			//	sprint += fmt.Sprintf("%s", testedURL)
 			//}

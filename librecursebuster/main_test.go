@@ -215,7 +215,7 @@ func setupConfig(cfg *Config, globalState *State, urlSliceZero string, printChan
 
 }
 
-func setupState(globalState *State, cfg *Config, wg *sync.WaitGroup, printChan chan OutLine) {
+func setupState(globalState *State, cfg *Config, printChan chan OutLine) {
 	for _, x := range strings.Split(cfg.Extensions, ",") {
 		globalState.Extensions = append(globalState.Extensions, x)
 	}
@@ -269,7 +269,7 @@ func getURLSlice(cfg *Config, printChan chan OutLine) []string {
 	return urlSlice
 }
 
-func startBusting(wg *sync.WaitGroup, globalState *State, cfg *Config, workers chan struct{}, printChan chan OutLine, pages chan SpiderPage, randURL string, u url.URL) {
+func startBusting(globalState *State, cfg *Config, workers chan struct{}, printChan chan OutLine, pages chan SpiderPage, randURL string, u url.URL) {
 	defer wg.Done()
 	if !cfg.NoWildcardChecks {
 		resp, err := HTTPReq("GET", randURL, globalState.Client, cfg)

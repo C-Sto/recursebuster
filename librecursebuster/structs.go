@@ -88,6 +88,17 @@ func SetState(s *State) {
 	gState = s
 }
 
+func (s *State) Wait() {
+	s.StartWG.Wait()
+	s.wg.Wait()
+	if s.ui != nil {
+		s.wg.Add(1)
+		s.ui.Update(func(*gocui.Gui) error { return gocui.ErrQuit })
+		s.wg.Wait()
+	}
+	//StopUI()
+}
+
 //State represents the current state of the program. Options are not configured here, those are found in Config.
 type State struct {
 	//Should probably have different concepts between config and state. Configs that might change depending on the URL being queried
@@ -113,12 +124,33 @@ type State struct {
 	Checked map[string]bool
 	CMut    *sync.RWMutex
 
+	StartWG *sync.WaitGroup
+	wg      *sync.WaitGroup
+
 	ui *gocui.Gui
 	//per host States
 	Hosts HostStates
 	//ParsedURL           *url.URL
 	//Soft404ResponseBody []byte
 	Version string
+}
+
+func (s *State) AddWG() {
+	s.wg.Add(1)
+}
+
+func (State) Init() *State {
+	s := &State{
+		BadResponses: make(map[int]bool),
+		Whitelist:    make(map[string]bool),
+		Blacklist:    make(map[string]bool),
+		StopDir:      make(chan struct{}, 1),
+		CMut:         &sync.RWMutex{},
+		Checked:      make(map[string]bool),
+		wg:           &sync.WaitGroup{},
+		StartWG:      &sync.WaitGroup{},
+	}
+	return s
 }
 
 //HostStates represents the interface to the Host States..? (all this smells of bad hacks)
