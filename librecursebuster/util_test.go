@@ -7,7 +7,6 @@ import (
 
 func TestGetUrls(t *testing.T) {
 	urlCount := 6
-	c := make(chan OutLine, 10)
 	page := `	
 	<a href=http://test.com/test1 >	
 	<a href=../test2.jpg >	
@@ -16,7 +15,7 @@ func TestGetUrls(t *testing.T) {
 	<a href='http://test.com/hack/the/planet' >	
 	<a href="http://test.com/.git/config" >	
 	`
-	urls, e := getUrls([]byte(page), c)
+	urls, e := getUrls([]byte(page))
 	if e != nil {
 		panic(e)
 	}

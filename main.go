@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	_ "net/http/pprof"
 
@@ -18,7 +17,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.5.6"
+const version = "1.5.7"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -91,28 +90,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	printChan := make(chan librecursebuster.OutLine, 200)
+	urlSlice := getURLSlice(cfg)
 
-	urlSlice := getURLSlice(cfg, printChan)
+	setupConfig(cfg, globalState, urlSlice[0])
 
-	setupConfig(cfg, globalState, urlSlice[0], printChan)
-
-	setupState(globalState, cfg, printChan)
-
-	//setup channels
-	pages := make(chan librecursebuster.SpiderPage, 1000)
-	newPages := make(chan librecursebuster.SpiderPage, 10000)
-	confirmed := make(chan librecursebuster.SpiderPage, 1000)
-	workers := make(chan struct{}, cfg.Threads)
-	//maxDirs := make(chan struct{}, cfg.MaxDirs)
-	testChan := make(chan string, 100)
-	quitChan := make(chan struct{})
+	setupState(globalState, cfg)
 
 	//do first load of urls (send canary requests to make sure we can dirbust them)
-
-	globalState.StartTime = time.Now()
-	globalState.PerSecondShort = new(uint64)
-	globalState.PerSecondLong = new(uint64)
+	quitChan := make(chan struct{})
 	if !cfg.NoUI {
 		uiWG := &sync.WaitGroup{}
 		uiWG.Add(1)
@@ -123,16 +108,16 @@ func main() {
 
 	if cfg.NoUI {
 		librecursebuster.PrintBanner(cfg)
-		go librecursebuster.StatusPrinter(cfg, printChan, testChan)
+		go librecursebuster.StatusPrinter(cfg)
 	} else {
-		go librecursebuster.UIPrinter(cfg, printChan, testChan)
+		go librecursebuster.UIPrinter(cfg)
 	}
-	go librecursebuster.ManageRequests(cfg, pages, newPages, confirmed, workers, printChan, testChan)
-	go librecursebuster.ManageNewURLs(cfg, pages, newPages, printChan)
-	go librecursebuster.OutputWriter(cfg, confirmed, cfg.Localpath, printChan)
+	go librecursebuster.ManageRequests(cfg)
+	go librecursebuster.ManageNewURLs(cfg)
+	go librecursebuster.OutputWriter(cfg, cfg.Localpath)
 	go librecursebuster.StatsTracker()
 
-	librecursebuster.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0, printChan)
+	librecursebuster.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0)
 
 	//seed the workers
 	for _, s := range urlSlice {
@@ -160,9 +145,9 @@ func main() {
 			prefix = prefix + "/"
 		}
 		randURL := fmt.Sprintf("%s%s", prefix, cfg.Canary)
-		workers <- struct{}{}
+		globalState.Chans.GetWorkers() <- struct{}{}
 		globalState.AddWG()
-		go librecursebuster.StartBusting(cfg, workers, printChan, pages, randURL, *u)
+		go librecursebuster.StartBusting(cfg, randURL, *u)
 
 	}
 
@@ -171,7 +156,7 @@ func main() {
 
 }
 
-func getURLSlice(cfg *librecursebuster.Config, printChan chan librecursebuster.OutLine) []string {
+func getURLSlice(cfg *librecursebuster.Config) []string {
 	urlSlice := []string{}
 	if cfg.URL != "" {
 		urlSlice = append(urlSlice, cfg.URL)
@@ -180,7 +165,7 @@ func getURLSlice(cfg *librecursebuster.Config, printChan chan librecursebuster.O
 	if cfg.InputList != "" { //can have both -u flag and -iL flag
 		//must be using an input list
 		URLList := make(chan string, 10)
-		go librecursebuster.LoadWords(cfg.InputList, URLList, printChan)
+		go librecursebuster.LoadWords(cfg.InputList, URLList)
 		for x := range URLList {
 			//ensure all urls will parse good
 			_, err := url.Parse(x)
@@ -200,7 +185,7 @@ func uiQuit(quitChan chan struct{}) {
 	os.Exit(0)
 }
 
-func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Config, printChan chan librecursebuster.OutLine) {
+func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Config) {
 	for _, x := range strings.Split(cfg.Extensions, ",") {
 		globalState.Extensions = append(globalState.Extensions, x)
 	}
@@ -217,14 +202,14 @@ func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Confi
 		globalState.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
 	}
 
-	globalState.Client = librecursebuster.ConfigureHTTPClient(cfg, printChan, false)
-	globalState.BurpClient = librecursebuster.ConfigureHTTPClient(cfg, printChan, true)
+	globalState.Client = librecursebuster.ConfigureHTTPClient(cfg, false)
+	globalState.BurpClient = librecursebuster.ConfigureHTTPClient(cfg, true)
 
 	globalState.Version = cfg.Version
 
 	if cfg.BlacklistLocation != "" {
 		readerChan := make(chan string, 100)
-		go librecursebuster.LoadWords(cfg.BlacklistLocation, readerChan, printChan)
+		go librecursebuster.LoadWords(cfg.BlacklistLocation, readerChan)
 		for x := range readerChan {
 			globalState.Blacklist[x] = true
 		}
@@ -232,7 +217,7 @@ func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Confi
 
 	if cfg.WhitelistLocation != "" {
 		readerChan := make(chan string, 100)
-		go librecursebuster.LoadWords(cfg.WhitelistLocation, readerChan, printChan)
+		go librecursebuster.LoadWords(cfg.WhitelistLocation, readerChan)
 		for x := range readerChan {
 			globalState.Whitelist[x] = true
 		}
@@ -247,7 +232,7 @@ func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Confi
 		//	globalState.WordlistLen = &zero
 
 		readerChan := make(chan string, 100)
-		go librecursebuster.LoadWords(cfg.Wordlist, readerChan, printChan)
+		go librecursebuster.LoadWords(cfg.Wordlist, readerChan)
 		for v := range readerChan {
 			globalState.WordList = append(globalState.WordList, v)
 			//atomic.AddUint32(globalState.WordlistLen, 1)
@@ -256,7 +241,7 @@ func setupState(globalState *librecursebuster.State, cfg *librecursebuster.Confi
 	librecursebuster.SetState(globalState)
 }
 
-func setupConfig(cfg *librecursebuster.Config, globalState *librecursebuster.State, urlSliceZero string, printChan chan librecursebuster.OutLine) {
+func setupConfig(cfg *librecursebuster.Config, globalState *librecursebuster.State, urlSliceZero string) {
 	if cfg.Debug {
 		go func() {
 			http.ListenAndServe("localhost:6061", http.DefaultServeMux)
@@ -283,7 +268,7 @@ func setupConfig(cfg *librecursebuster.Config, globalState *librecursebuster.Sta
 	globalState.Hosts.AddHost(h)
 
 	if cfg.Canary == "" {
-		cfg.Canary = librecursebuster.RandString(printChan)
+		cfg.Canary = librecursebuster.RandString()
 	}
 
 }

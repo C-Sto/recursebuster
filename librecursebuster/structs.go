@@ -99,6 +99,35 @@ func (s *State) Wait() {
 	//StopUI()
 }
 
+type chans struct {
+	pagesChan,
+	newPagesChan,
+	confirmedChan chan SpiderPage
+
+	workersChan,
+	quitChan chan struct{}
+
+	printChan chan OutLine
+	testChan  chan string
+}
+
+func (c *chans) GetWorkers() chan struct{} {
+	return c.workersChan
+}
+
+func (chans) Init() *chans {
+	return &chans{
+		pagesChan:     make(chan SpiderPage, 1000),
+		newPagesChan:  make(chan SpiderPage, 10000),
+		confirmedChan: make(chan SpiderPage, 1000),
+		workersChan:   make(chan struct{}, 1),
+		//maxDirs := make(chan struct{}, cfg.MaxDirs),
+		testChan:  make(chan string, 100),
+		quitChan:  make(chan struct{}),
+		printChan: make(chan OutLine, 100),
+	}
+}
+
 //State represents the current state of the program. Options are not configured here, those are found in Config.
 type State struct {
 	//Should probably have different concepts between config and state. Configs that might change depending on the URL being queried
@@ -130,6 +159,7 @@ type State struct {
 	ui *gocui.Gui
 	//per host States
 	Hosts HostStates
+	Chans *chans
 	//ParsedURL           *url.URL
 	//Soft404ResponseBody []byte
 	Version string
@@ -141,14 +171,18 @@ func (s *State) AddWG() {
 
 func (State) Init() *State {
 	s := &State{
-		BadResponses: make(map[int]bool),
-		Whitelist:    make(map[string]bool),
-		Blacklist:    make(map[string]bool),
-		StopDir:      make(chan struct{}, 1),
-		CMut:         &sync.RWMutex{},
-		Checked:      make(map[string]bool),
-		wg:           &sync.WaitGroup{},
-		StartWG:      &sync.WaitGroup{},
+		BadResponses:   make(map[int]bool),
+		Whitelist:      make(map[string]bool),
+		Blacklist:      make(map[string]bool),
+		StopDir:        make(chan struct{}, 1),
+		CMut:           &sync.RWMutex{},
+		Checked:        make(map[string]bool),
+		wg:             &sync.WaitGroup{},
+		StartWG:        &sync.WaitGroup{},
+		Chans:          chans{}.Init(),
+		StartTime:      time.Now(),
+		PerSecondShort: new(uint64),
+		PerSecondLong:  new(uint64),
 	}
 	return s
 }

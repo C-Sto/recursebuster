@@ -39,7 +39,7 @@ func printOpts(s *Config) {
 }
 
 //OutputWriter will write to a file and the screen
-func OutputWriter(cfg *Config, confirmed chan SpiderPage, localPath string, printChan chan OutLine) {
+func OutputWriter(cfg *Config, localPath string) {
 	//output worker
 	pages := make(map[string]bool) //keep it unique
 	file, err := os.OpenFile(localPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
@@ -58,7 +58,7 @@ func OutputWriter(cfg *Config, confirmed chan SpiderPage, localPath string, prin
 		stringToWrite = "%s"
 	}
 	for {
-		object := <-confirmed
+		object := <-gState.Chans.confirmedChan
 		page := object.URL
 		if _, ok := pages[page]; !ok {
 			pages[page] = true
@@ -79,32 +79,32 @@ func OutputWriter(cfg *Config, confirmed chan SpiderPage, localPath string, prin
 			file.WriteString(writeS + "\n")
 			file.Sync()
 
-			printBasedOnStatus(object.Result.StatusCode, printS, printChan)
+			printBasedOnStatus(object.Result.StatusCode, printS)
 		}
 		gState.wg.Done()
 		//wg.Done()
 	}
 }
 
-func printBasedOnStatus(status int, printS string, printChan chan OutLine) {
+func printBasedOnStatus(status int, printS string) {
 	x := status
 	if 199 < x && x < 300 { //2xx
-		PrintOutput(printS, Good2, 0, printChan)
+		PrintOutput(printS, Good2, 0)
 	} else if 299 < x && x < 400 { //3xx
-		PrintOutput(printS, Good3, 0, printChan)
+		PrintOutput(printS, Good3, 0)
 	} else if 399 < x && x < 500 { //4xx
-		PrintOutput(printS, Good4, 0, printChan)
+		PrintOutput(printS, Good4, 0)
 	} else if 499 < x && x < 600 { //5xx
-		PrintOutput(printS, Good5, 0, printChan)
+		PrintOutput(printS, Good5, 0)
 	} else {
-		PrintOutput(printS, Goodx, 0, printChan)
+		PrintOutput(printS, Goodx, 0)
 	}
 }
 
 //PrintOutput used to send output to the screen
-func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, printChan chan OutLine) {
+func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int) {
 	gState.wg.Add(1)
-	printChan <- OutLine{
+	gState.Chans.printChan <- OutLine{
 		Content: message,
 		Type:    writer,
 		Level:   verboseLevel,
@@ -112,12 +112,12 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int, printC
 }
 
 //UIPrinter is called to write a pretty UI
-func UIPrinter(cfg *Config, printChan chan OutLine, testChan chan string) {
+func UIPrinter(cfg *Config) {
 	tick := time.NewTicker(time.Second / 30) //30 'fps'
 	testedURL := ""
 	for {
 		select {
-		case o := <-printChan:
+		case o := <-gState.Chans.printChan:
 			//something to print
 			//v.Write([]byte(o.Content + "\n"))
 			if cfg.VerboseLevel >= o.Level {
@@ -132,7 +132,7 @@ func UIPrinter(cfg *Config, printChan chan OutLine, testChan chan string) {
 			//refreshUI() //time has elapsed the amount of time - it's been 2 seconds
 			updateUI()
 
-		case t := <-testChan:
+		case t := <-gState.Chans.testChan:
 			//URL has been assessed
 			testedURL = t
 		}
@@ -181,14 +181,14 @@ func writeStatus(s string) {
 }
 
 //StatusPrinter is the function that performs all the status printing logic
-func StatusPrinter(cfg *Config, printChan chan OutLine, testChan chan string) {
+func StatusPrinter(cfg *Config) {
 	tick := time.NewTicker(time.Second * 2)
 	status := getStatus()
 	spacesToClear := 0
 	testedURL := ""
 	for {
 		select {
-		case o := <-printChan:
+		case o := <-gState.Chans.printChan:
 			//shoudln't need to check for status here..
 			//clear the line before printing anything
 			if cfg.NoUI {
@@ -212,7 +212,7 @@ func StatusPrinter(cfg *Config, printChan chan OutLine, testChan chan string) {
 		case <-tick.C: //time has elapsed the amount of time - it's been 2 seconds
 			status = getStatus()
 
-		case t := <-testChan: //a URL has been assessed
+		case t := <-gState.Chans.testChan: //a URL has been assessed
 			status = getStatus()
 			testedURL = t
 		}

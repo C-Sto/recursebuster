@@ -14,7 +14,7 @@ import (
 )
 
 //RandString will return a UUID
-func RandString(printChan chan OutLine) string {
+func RandString() string {
 	b := make([]byte, 16)
 	_, err := rand.Read(b)
 	if err != nil {
@@ -26,7 +26,7 @@ func RandString(printChan chan OutLine) string {
 }
 
 //returns a slice of strings containing urls
-func getUrls(page []byte, printChan chan OutLine) ([]string, error) {
+func getUrls(page []byte) ([]string, error) {
 
 	ret := []string{}
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(page))

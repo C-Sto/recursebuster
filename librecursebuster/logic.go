@@ -10,27 +10,27 @@ import (
 )
 
 //ManageRequests handles the request workers
-func ManageRequests(cfg *Config, pages, newPages, confirmed chan SpiderPage, workers chan struct{}, printChan chan OutLine, testChan chan string) {
+func ManageRequests(cfg *Config) {
 	//manages net request workers
 	for {
-		page := <-pages
+		page := <-gState.Chans.pagesChan
 		if gState.Blacklist[page.URL] {
 			gState.wg.Done()
-			PrintOutput(fmt.Sprintf("Not testing blacklisted URL: %s", page.URL), Info, 0, printChan)
+			PrintOutput(fmt.Sprintf("Not testing blacklisted URL: %s", page.URL), Info, 0)
 			continue
 		}
 		for _, method := range gState.Methods {
 			if page.Result == nil && !cfg.NoBase {
-				workers <- struct{}{}
+				gState.Chans.workersChan <- struct{}{}
 				gState.wg.Add(1)
-				go testURL(cfg, method, page.URL, gState.Client, newPages, workers, confirmed, printChan, testChan)
+				go testURL(cfg, method, page.URL, gState.Client)
 			}
 			if cfg.Wordlist != "" && string(page.URL[len(page.URL)-1]) == "/" { //if we are testing a directory
 
 				//check for wildcard response
 
 				//	maxDirs <- struct{}{}
-				dirBust(cfg, page, workers, pages, newPages, confirmed, printChan, testChan)
+				dirBust(cfg, page)
 			}
 		}
 		gState.wg.Done()
@@ -39,17 +39,17 @@ func ManageRequests(cfg *Config, pages, newPages, confirmed chan SpiderPage, wor
 }
 
 //ManageNewURLs will take in any URL, and decide if it should be added to the queue for bustin', or if we discovered something new
-func ManageNewURLs(cfg *Config, pages, newpages chan SpiderPage, printChan chan OutLine) {
+func ManageNewURLs(cfg *Config) {
 	//decides on whether to add to the directory list, or add to file output
 	for {
-		candidate := <-newpages
+		candidate := <-gState.Chans.newPagesChan
 
 		//check the candidate is an actual URL
 		u, err := url.Parse(strings.TrimSpace(candidate.URL))
 
 		if err != nil {
 			gState.wg.Done()
-			PrintOutput(err.Error(), Error, 0, printChan)
+			PrintOutput(err.Error(), Error, 0)
 			continue //probably a better way of doing this
 		}
 
@@ -68,8 +68,8 @@ func ManageNewURLs(cfg *Config, pages, newpages chan SpiderPage, printChan chan 
 			gState.Checked[actualURL] = true
 			gState.CMut.Unlock()
 			gState.wg.Add(1)
-			pages <- SpiderPage{URL: actualURL, Reference: candidate.Reference, Result: candidate.Result}
-			PrintOutput("URL Added: "+actualURL, Debug, 3, printChan)
+			gState.Chans.pagesChan <- SpiderPage{URL: actualURL, Reference: candidate.Reference, Result: candidate.Result}
+			PrintOutput("URL Added: "+actualURL, Debug, 3)
 
 			//also add any directories in the supplied path to the 'to be hacked' queue
 			path := ""
@@ -97,7 +97,7 @@ func ManageNewURLs(cfg *Config, pages, newpages chan SpiderPage, printChan chan 
 				}
 				gState.CMut.RUnlock()
 				gState.wg.Add(1)
-				newpages <- newPage
+				gState.Chans.newPagesChan <- newPage
 			}
 		} else {
 			gState.CMut.Unlock()
@@ -107,18 +107,16 @@ func ManageNewURLs(cfg *Config, pages, newpages chan SpiderPage, printChan chan 
 	}
 }
 
-func testURL(cfg *Config, method string, urlString string, client *http.Client,
-	newPages chan SpiderPage, workers chan struct{},
-	confirmedGood chan SpiderPage, printChan chan OutLine, testChan chan string) {
+func testURL(cfg *Config, method string, urlString string, client *http.Client) {
 	defer func() {
 		gState.wg.Done()
 		atomic.AddUint64(gState.TotalTested, 1)
 	}()
 	select {
-	case testChan <- method + ":" + urlString:
+	case gState.Chans.testChan <- method + ":" + urlString:
 	default: //this is to prevent blocking, it doesn't _really_ matter if it doesn't get written to output
 	}
-	headResp, content, good := evaluateURL(cfg, method, urlString, client, workers, printChan)
+	headResp, content, good := evaluateURL(cfg, method, urlString, client)
 
 	if !good && !cfg.ShowAll {
 		return
@@ -127,16 +125,16 @@ func testURL(cfg *Config, method string, urlString string, client *http.Client,
 	//inception (but also check if the directory version is good, and add that to the queue too)
 	if string(urlString[len(urlString)-1]) != "/" && good {
 		gState.wg.Add(1)
-		newPages <- SpiderPage{URL: urlString + "/", Reference: headResp.Request.URL, Result: headResp}
+		gState.Chans.newPagesChan <- SpiderPage{URL: urlString + "/", Reference: headResp.Request.URL, Result: headResp}
 	}
 
 	gState.wg.Add(1)
-	confirmedGood <- SpiderPage{URL: urlString, Result: headResp, Reference: headResp.Request.URL}
+	gState.Chans.confirmedChan <- SpiderPage{URL: urlString, Result: headResp, Reference: headResp.Request.URL}
 
 	if !cfg.NoSpider && good && !cfg.NoRecursion {
-		urls, err := getUrls(content, printChan)
+		urls, err := getUrls(content)
 		if err != nil {
-			PrintOutput(err.Error(), Error, 0, printChan)
+			PrintOutput(err.Error(), Error, 0)
 		}
 		for _, x := range urls { //add any found pages into the pool
 			//add all the directories
@@ -146,26 +144,26 @@ func testURL(cfg *Config, method string, urlString string, client *http.Client,
 
 			PrintOutput(
 				fmt.Sprintf("Found URL on page: %s", x),
-				Debug, 3, printChan,
+				Debug, 3,
 			)
 
 			gState.wg.Add(1)
-			newPages <- newPage
+			gState.Chans.newPagesChan <- newPage
 		}
 	}
 }
 
-func dirBust(cfg *Config, page SpiderPage, workers chan struct{}, pages, newPages, confirmed chan SpiderPage, printChan chan OutLine, testChan chan string) {
+func dirBust(cfg *Config, page SpiderPage) {
 	//ugh
 	u, err := url.Parse(page.URL)
 	if err != nil {
-		PrintOutput("This should never occur, url parse error on parsed url?"+err.Error(), Error, 0, printChan)
+		PrintOutput("This should never occur, url parse error on parsed url?"+err.Error(), Error, 0)
 		return
 	}
 	//check to make sure we aren't dirbusting a wildcardyboi (NOTE!!! USES FIRST SPECIFIED MEHTOD TO DO SOFT 404!)
 	if !cfg.NoWildcardChecks {
-		workers <- struct{}{}
-		h, _, res := evaluateURL(cfg, gState.Methods[0], page.URL+RandString(printChan), gState.Client, workers, printChan)
+		gState.Chans.workersChan <- struct{}{}
+		h, _, res := evaluateURL(cfg, gState.Methods[0], page.URL+RandString(), gState.Client)
 
 		if res { //true response indicates a good response for a guid path, unlikely good
 			if detectSoft404(h, gState.Hosts.Get404(u.Host), cfg.Ratio404) {
@@ -173,7 +171,7 @@ func dirBust(cfg *Config, page SpiderPage, workers chan struct{}, pages, newPage
 			} else {
 				PrintOutput(
 					fmt.Sprintf("Wildcard response detected, skipping dirbusting of %s", page.URL),
-					Info, 0, printChan)
+					Info, 0)
 				return
 			}
 		}
@@ -182,7 +180,7 @@ func dirBust(cfg *Config, page SpiderPage, workers chan struct{}, pages, newPage
 	if !cfg.NoStartStop {
 		PrintOutput(
 			fmt.Sprintf("Dirbusting %s", page.URL),
-			Info, 0, printChan,
+			Info, 0,
 		)
 	}
 
@@ -199,7 +197,7 @@ func dirBust(cfg *Config, page SpiderPage, workers chan struct{}, pages, newPage
 		case <-gState.StopDir:
 			//<-maxDirs
 			if !cfg.NoStartStop {
-				PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0, printChan)
+				PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0)
 			}
 			return
 		default:
@@ -210,9 +208,9 @@ func dirBust(cfg *Config, page SpiderPage, workers chan struct{}, pages, newPage
 						if tested[page.URL+word+"."+ext] {
 							continue
 						}
-						workers <- struct{}{}
+						gState.Chans.workersChan <- struct{}{}
 						gState.wg.Add(1)
-						go testURL(cfg, method, page.URL+word+"."+ext, gState.Client, newPages, workers, confirmed, printChan, testChan)
+						go testURL(cfg, method, page.URL+word+"."+ext, gState.Client)
 						tested[page.URL+word+"."+ext] = true
 					}
 				}
@@ -220,17 +218,17 @@ func dirBust(cfg *Config, page SpiderPage, workers chan struct{}, pages, newPage
 					if tested[page.URL+word+"/"] {
 						continue
 					}
-					workers <- struct{}{}
+					gState.Chans.workersChan <- struct{}{}
 					gState.wg.Add(1)
-					go testURL(cfg, method, page.URL+word+"/", gState.Client, newPages, workers, confirmed, printChan, testChan)
+					go testURL(cfg, method, page.URL+word+"/", gState.Client)
 					tested[page.URL+word+"/"] = true
 				}
 				if tested[page.URL+word] {
 					continue
 				}
-				workers <- struct{}{}
+				gState.Chans.workersChan <- struct{}{}
 				gState.wg.Add(1)
-				go testURL(cfg, method, page.URL+word, gState.Client, newPages, workers, confirmed, printChan, testChan)
+				go testURL(cfg, method, page.URL+word, gState.Client)
 				tested[page.URL+word] = true
 				//if cfg.MaxDirs == 1 {
 				atomic.AddUint32(gState.DirbProgress, 1)
@@ -240,22 +238,21 @@ func dirBust(cfg *Config, page SpiderPage, workers chan struct{}, pages, newPage
 	}
 	//<-maxDirs
 	if !cfg.NoStartStop {
-		PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0, printChan)
+		PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0)
 	}
 }
 
-func StartBusting(cfg *Config, workers chan struct{}, printChan chan OutLine, pages chan SpiderPage, randURL string, u url.URL) {
+func StartBusting(cfg *Config, randURL string, u url.URL) {
 	defer gState.wg.Done()
 	if !cfg.NoWildcardChecks {
 		resp, err := HTTPReq("GET", randURL, gState.Client, cfg)
-		<-workers
+		<-gState.Chans.workersChan
 		if err != nil {
 			if cfg.InputList != "" {
 				PrintOutput(
 					err.Error(),
 					Error,
 					0,
-					printChan,
 				)
 				return
 			}
@@ -264,12 +261,12 @@ func StartBusting(cfg *Config, workers chan struct{}, printChan chan OutLine, pa
 		}
 		PrintOutput(
 			fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
-			Debug, 2, printChan,
+			Debug, 2,
 		)
 		content, _ := ioutil.ReadAll(resp.Body)
 		gState.Hosts.AddSoft404Content(u.Host, content, resp) // Soft404ResponseBody = xx
 	} else {
-		<-workers
+		<-gState.Chans.workersChan
 	}
 	x := SpiderPage{}
 	x.URL = u.String()
@@ -279,17 +276,17 @@ func StartBusting(cfg *Config, workers chan struct{}, printChan chan OutLine, pa
 	defer gState.CMut.Unlock()
 	if ok := gState.Checked[u.String()+"/"]; !strings.HasSuffix(u.String(), "/") && !ok {
 		gState.wg.Add(1)
-		pages <- SpiderPage{
+		gState.Chans.pagesChan <- SpiderPage{
 			URL:       u.String() + "/",
 			Reference: &u,
 		}
 		gState.Checked[u.String()+"/"] = true
-		PrintOutput("URL Added: "+u.String()+"/", Debug, 3, printChan)
+		PrintOutput("URL Added: "+u.String()+"/", Debug, 3)
 	}
 	if ok := gState.Checked[x.URL]; !ok {
 		gState.wg.Add(1)
-		pages <- x
+		gState.Chans.pagesChan <- x
 		gState.Checked[x.URL] = true
-		PrintOutput("URL Added: "+x.URL, Debug, 3, printChan)
+		PrintOutput("URL Added: "+x.URL, Debug, 3)
 	}
 }

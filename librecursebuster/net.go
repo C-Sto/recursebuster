@@ -15,7 +15,7 @@ import (
 )
 
 //ConfigureHTTPClient configures and returns a HTTP Client (mostly useful to be able to send to burp)
-func ConfigureHTTPClient(cfg *Config, printChan chan OutLine, sendToBurpOnly bool) *http.Client {
+func ConfigureHTTPClient(cfg *Config, sendToBurpOnly bool) *http.Client {
 
 	httpTransport := &http.Transport{MaxIdleConns: 100}
 	client := &http.Client{Transport: httpTransport, Timeout: time.Duration(cfg.Timeout) * time.Second}
@@ -47,7 +47,7 @@ func ConfigureHTTPClient(cfg *Config, printChan chan OutLine, sendToBurpOnly boo
 		}
 		if !sendToBurpOnly {
 			//send the set proxy status (don't need this for burp requests)
-			PrintOutput(fmt.Sprintf("Proxy set to: %s", cfg.ProxyAddr), Info, 0, printChan)
+			PrintOutput(fmt.Sprintf("Proxy set to: %s", cfg.ProxyAddr), Info, 0)
 		}
 	}
 
@@ -94,7 +94,7 @@ func HTTPReq(method, path string, client *http.Client, cfg *Config) (resp *http.
 	return resp, err
 }
 
-func evaluateURL(cfg *Config, method string, urlString string, client *http.Client, workers chan struct{}, printChan chan OutLine) (headResp *http.Response, content []byte, success bool) {
+func evaluateURL(cfg *Config, method string, urlString string, client *http.Client) (headResp *http.Response, content []byte, success bool) {
 	success = true
 	//wg.Add(1)
 	//PrintOutput("EVALUATING:"+method+":"+urlString, Debug, 4, wg, printChan)
@@ -103,15 +103,15 @@ func evaluateURL(cfg *Config, method string, urlString string, client *http.Clie
 		headResp, err := HTTPReq("HEAD", urlString, client, cfg) //send a HEAD. Ignore body response
 		if err != nil {
 			success = false
-			<-workers //done with the net thread
-			PrintOutput(fmt.Sprintf("%s", err), Error, 0, printChan)
+			<-gState.Chans.workersChan //done with the net thread
+			PrintOutput(fmt.Sprintf("%s", err), Error, 0)
 			return headResp, content, success
 		}
 
 		//Check if we care about it (header only) section
 		if gState.BadResponses[headResp.StatusCode] {
 			success = false
-			<-workers
+			<-gState.Chans.workersChan
 			return headResp, content, success
 		}
 
@@ -120,17 +120,17 @@ func evaluateURL(cfg *Config, method string, urlString string, client *http.Clie
 			if cfg.BurpMode { //send successful request again... twice as many requests, but less burp spam
 				HTTPReq("HEAD", urlString, gState.BurpClient, cfg) //send a HEAD. Ignore body response
 			}
-			<-workers
+			<-gState.Chans.workersChan
 			return headResp, content, success
 		}
 	}
 
 	headResp, err := HTTPReq(method, urlString, client, cfg)
 	content, _ = ioutil.ReadAll(headResp.Body)
-	<-workers //done with the net thread
+	<-gState.Chans.workersChan //done with the net thread
 	if err != nil {
 		success = false
-		PrintOutput(fmt.Sprintf("%s", err), Error, 0, printChan)
+		PrintOutput(fmt.Sprintf("%s", err), Error, 0)
 
 		return headResp, content, success
 	}
@@ -162,7 +162,7 @@ func evaluateURL(cfg *Config, method string, urlString string, client *http.Clie
 		fmt.Sprintf("Checking body for 404:\nContent: %v,\nSoft404:%v,\nResponse:%v",
 			string(content), string(gState.Hosts.Get404Body(headResp.Request.Host)),
 			detectSoft404(headResp, gState.Hosts.Get404(headResp.Request.Host), cfg.Ratio404)),
-		Debug, 4, printChan)
+		Debug, 4)
 	if detectSoft404(headResp, gState.Hosts.Get404(headResp.Request.Host), cfg.Ratio404) {
 		//seems to be a soft 404 lol
 		return headResp, content, false

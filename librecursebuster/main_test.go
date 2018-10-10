@@ -2,7 +2,6 @@ package librecursebuster
 
 import (
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -13,6 +12,8 @@ import (
 	"github.com/c-sto/recursebuster/librecursebuster/testserver"
 )
 
+const localURL = "http://localhost:12345/"
+
 func TestBasicFunctionality(t *testing.T) {
 
 	cfg := &Config{}
@@ -21,6 +22,115 @@ func TestBasicFunctionality(t *testing.T) {
 	globalState := State{}.Init()
 	globalState.Hosts.Init()
 
+	testserver.Start()
+
+	cfg.URL = localURL
+
+	urlSlice := getURLSlice(cfg)
+
+	setupConfig(cfg, globalState, urlSlice[0])
+
+	setupState(globalState, cfg)
+
+	wordlist := `a
+b
+c
+d
+e
+x
+y
+z
+`
+
+	globalState.WordList = strings.Split(wordlist, "\n")
+
+	cfg.Wordlist = "test"
+
+	go ManageRequests(cfg)
+	go ManageNewURLs(cfg)
+
+	u, err := url.Parse(urlSlice[0])
+	if err != nil {
+		panic(err)
+	}
+	//canary
+	prefix := u.String()
+	if len(prefix) > 0 && string(prefix[len(prefix)-1]) != "/" {
+		prefix = prefix + "/"
+	}
+	randURL := fmt.Sprintf("%s%s", prefix, cfg.Canary)
+	globalState.AddWG()
+	gState.Chans.GetWorkers() <- struct{}{}
+	go StartBusting(cfg, randURL, *u)
+
+	go func() {
+		for {
+			p := <-gState.Chans.printChan
+			globalState.wg.Done()
+			if p.Level > 1 {
+				continue
+			}
+		}
+	}()
+	found := make(map[string]bool)
+	go func() {
+		t := time.NewTicker(1 * time.Second).C
+		for {
+			select {
+			case x := <-gState.Chans.confirmedChan:
+				globalState.wg.Done()
+				u, e := url.Parse(x.URL)
+				if e != nil {
+					panic(e)
+				}
+				found[u.Path] = true
+				//fmt.Println("CONFIRMED!", x)
+			case <-t:
+				//fmt.Println(globalState.wg)
+			}
+		}
+	}()
+	//waitgroup check (if test times out, the waitgroup is broken... somewhere)
+	globalState.Wait()
+
+	//fmt.Println("Ready to test!")
+	//check for each specific line that should be in there..
+	ok200 := []string{
+		"/a", "/a/b", "/a/b/c", "/a/",
+	}
+	for _, i := range ok200 {
+		if x, ok := found[i]; !ok || !x {
+			panic("Did not find " + i)
+		}
+	}
+	ok300 := []string{
+		"/b", "/b/c",
+	}
+	for _, i := range ok300 {
+		if x, ok := found[i]; !ok || !x {
+			panic("Did not find " + i)
+		}
+	}
+	ok400 := []string{
+		"/a/b/c/", "/a/b/c/d",
+	}
+	for _, i := range ok400 {
+		if x, ok := found[i]; !ok || !x {
+			panic("Did not find " + i)
+		}
+	}
+	ok500 := []string{
+		"/c/d", "/c", "/c/",
+	}
+	for _, i := range ok500 {
+		if x, ok := found[i]; !ok || !x {
+			panic("Did not find " + i)
+		}
+	}
+
+}
+
+func setupConfig(cfg *Config, globalState *State, urlSliceZero string) {
 	cfg.Version = "TEST"
 	totesTested := uint64(0)
 	globalState.TotalTested = &totesTested
@@ -66,134 +176,7 @@ func TestBasicFunctionality(t *testing.T) {
 	cfg.Wordlist = ""
 	cfg.WhitelistLocation = ""
 
-	testserver.Start()
-	localURL := "http://localhost:12345/"
 	cfg.URL = localURL
-	wordlist := `a
-b
-c
-d
-e
-x
-y
-z
-`
-	printChan := make(chan OutLine, 50)
-
-	urlSlice := getURLSlice(cfg, printChan)
-
-	setupConfig(cfg, globalState, urlSlice[0], printChan)
-
-	setupState(globalState, cfg, printChan)
-
-	//setup channels
-	pages := make(chan SpiderPage, 1000)
-	newPages := make(chan SpiderPage, 10000)
-	confirmed := make(chan SpiderPage, 1000)
-	workers := make(chan struct{}, cfg.Threads)
-	//maxDirs := make(chan struct{}, cfg.MaxDirs)
-	testChan := make(chan string, 100)
-	//quitChan := make(chan struct{})
-
-	globalState.StartTime = time.Now()
-	globalState.PerSecondShort = new(uint64)
-	globalState.PerSecondLong = new(uint64)
-
-	globalState.WordList = strings.Split(wordlist, "\n")
-
-	cfg.Wordlist = "test"
-
-	go ManageRequests(cfg, pages, newPages, confirmed, workers, printChan, testChan)
-	go ManageNewURLs(cfg, pages, newPages, printChan)
-
-	u, err := url.Parse(urlSlice[0])
-	if err != nil {
-		panic(err)
-	}
-	//canary
-	prefix := u.String()
-	if len(prefix) > 0 && string(prefix[len(prefix)-1]) != "/" {
-		prefix = prefix + "/"
-	}
-	randURL := fmt.Sprintf("%s%s", prefix, cfg.Canary)
-	globalState.AddWG()
-	workers <- struct{}{}
-	go StartBusting(cfg, workers, printChan, pages, randURL, *u)
-
-	go func() {
-		for {
-			p := <-printChan
-			globalState.wg.Done()
-			if p.Level > 1 {
-				continue
-			}
-			fmt.Println(p.Content)
-		}
-	}()
-	found := make(map[string]bool)
-	go func() {
-		t := time.NewTicker(1 * time.Second).C
-		for {
-			select {
-			case x := <-confirmed:
-				globalState.wg.Done()
-				u, e := url.Parse(x.URL)
-				if e != nil {
-					panic(e)
-				}
-				found[u.Path] = true
-				fmt.Println("CONFIRMED!", x)
-			case <-t:
-				fmt.Println(globalState.wg)
-			}
-		}
-	}()
-	//waitgroup check (if test times out, the waitgroup is broken... somewhere)
-	globalState.Wait()
-
-	fmt.Println("Ready to test!")
-	//check for each specific line that should be in there..
-	ok200 := []string{
-		"/a", "/a/b", "/a/b/c", "/a/",
-	}
-	for _, i := range ok200 {
-		if x, ok := found[i]; !ok || !x {
-			panic("Did not find " + i)
-		}
-	}
-	ok300 := []string{
-		"/b", "/b/c",
-	}
-	for _, i := range ok300 {
-		if x, ok := found[i]; !ok || !x {
-			panic("Did not find " + i)
-		}
-	}
-	ok400 := []string{
-		"/a/b/c/", "/a/b/c/d",
-	}
-	for _, i := range ok400 {
-		if x, ok := found[i]; !ok || !x {
-			panic("Did not find " + i)
-		}
-	}
-	ok500 := []string{
-		"/c/d", "/c", "/c/",
-	}
-	for _, i := range ok500 {
-		if x, ok := found[i]; !ok || !x {
-			panic("Did not find " + i)
-		}
-	}
-
-}
-
-func setupConfig(cfg *Config, globalState *State, urlSliceZero string, printChan chan OutLine) {
-	if cfg.Debug {
-		go func() {
-			http.ListenAndServe("localhost:6061", http.DefaultServeMux)
-		}()
-	}
 
 	var h *url.URL
 	var err error
@@ -215,12 +198,12 @@ func setupConfig(cfg *Config, globalState *State, urlSliceZero string, printChan
 	globalState.Hosts.AddHost(h)
 
 	if cfg.Canary == "" {
-		cfg.Canary = RandString(printChan)
+		cfg.Canary = RandString()
 	}
 
 }
 
-func setupState(globalState *State, cfg *Config, printChan chan OutLine) {
+func setupState(globalState *State, cfg *Config) {
 	for _, x := range strings.Split(cfg.Extensions, ",") {
 		globalState.Extensions = append(globalState.Extensions, x)
 	}
@@ -237,26 +220,10 @@ func setupState(globalState *State, cfg *Config, printChan chan OutLine) {
 		globalState.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
 	}
 
-	globalState.Client = ConfigureHTTPClient(cfg, printChan, false)
-	globalState.BurpClient = ConfigureHTTPClient(cfg, printChan, true)
+	globalState.Client = ConfigureHTTPClient(cfg, false)
+	globalState.BurpClient = ConfigureHTTPClient(cfg, true)
 
 	globalState.Version = cfg.Version
-
-	if cfg.BlacklistLocation != "" {
-		readerChan := make(chan string, 100)
-		go LoadWords(cfg.BlacklistLocation, readerChan, printChan)
-		for x := range readerChan {
-			globalState.Blacklist[x] = true
-		}
-	}
-
-	if cfg.WhitelistLocation != "" {
-		readerChan := make(chan string, 100)
-		go LoadWords(cfg.WhitelistLocation, readerChan, printChan)
-		for x := range readerChan {
-			globalState.Whitelist[x] = true
-		}
-	}
 
 	// && cfg.MaxDirs == 1 {
 
@@ -266,9 +233,13 @@ func setupState(globalState *State, cfg *Config, printChan chan OutLine) {
 	//	zero := uint32(0)
 	//	globalState.WordlistLen = &zero
 
+	globalState.StartTime = time.Now()
+	globalState.PerSecondShort = new(uint64)
+	globalState.PerSecondLong = new(uint64)
+
 	SetState(globalState)
 }
-func getURLSlice(cfg *Config, printChan chan OutLine) []string {
+func getURLSlice(cfg *Config) []string {
 	urlSlice := []string{}
 	if cfg.URL != "" {
 		urlSlice = append(urlSlice, cfg.URL)
