@@ -104,11 +104,9 @@ type chans struct {
 	newPagesChan,
 	confirmedChan chan SpiderPage
 
-	workersChan,
-	quitChan chan struct{}
-
-	printChan chan OutLine
-	testChan  chan string
+	workersChan chan struct{}
+	printChan   chan OutLine
+	testChan    chan string
 }
 
 func (c *chans) GetWorkers() chan struct{} {
@@ -123,7 +121,6 @@ func (chans) Init() *chans {
 		workersChan:   make(chan struct{}, 1),
 		//maxDirs := make(chan struct{}, cfg.MaxDirs),
 		testChan:  make(chan string, 100),
-		quitChan:  make(chan struct{}),
 		printChan: make(chan OutLine, 100),
 	}
 }
