@@ -242,6 +242,7 @@ func dirBust(page SpiderPage) {
 	}
 }
 
+//StartBusting will add a suppllied url to the queue to be tested
 func StartBusting(randURL string, u url.URL) {
 	defer gState.wg.Done()
 	if !gState.Cfg.NoWildcardChecks {

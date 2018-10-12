@@ -90,6 +90,7 @@ func SetState(s *State) {
 	gState = s
 }
 
+//Wait will wait until all the relevant waitgroups have completed
 func (s *State) Wait() {
 	s.StartWG.Wait()
 	s.wg.Wait()
@@ -165,10 +166,12 @@ type State struct {
 	Version string
 }
 
+//AddWG adds a single value to the state waitgroup
 func (s *State) AddWG() {
 	s.wg.Add(1)
 }
 
+//Init returns a new state value with initialised attributes
 func (State) Init() *State {
 	s := &State{
 		BadResponses:   make(map[int]bool),
@@ -314,6 +317,7 @@ type SpiderPage struct {
 	Reference *url.URL //where did we get this URL from? (for the logic portion)
 }
 
+//SetupState will perform all the basic state setup functions (adding URL's to the blacklist etc)
 func SetupState(globalState *State) {
 	SetState(globalState)
 	for _, x := range strings.Split(globalState.Cfg.Extensions, ",") {

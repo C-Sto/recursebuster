@@ -63,6 +63,7 @@ func (s *State) StartUI(uiWG *sync.WaitGroup, quitChan chan struct{}) {
 	}
 }
 
+//StopUI should be called when closing the program. It prints out the lines in the main view buffer to stdout, and closes the ui object
 func StopUI() {
 	p, _ := gState.ui.View("Main")
 	lines := p.ViewBuffer()
