@@ -164,7 +164,7 @@ func dirBust(page SpiderPage) {
 	if !gState.Cfg.NoWildcardChecks {
 		gState.Chans.workersChan <- struct{}{}
 		h, _, res := evaluateURL(gState.Methods[0], page.URL+RandString(), gState.Client)
-
+		//fmt.Println(page.URL, h, res)
 		if res { //true response indicates a good response for a guid path, unlikely good
 			if detectSoft404(h, gState.Hosts.Get404(u.Host), gState.Cfg.Ratio404) {
 				//it's a soft404 probably, guess we can continue (this logic seems wrong??)

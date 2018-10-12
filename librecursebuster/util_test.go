@@ -20,9 +20,9 @@ func TestGetUrls(t *testing.T) {
 		panic(e)
 	}
 	if len(urls) != urlCount {
+		fmt.Println(urls)
 		t.Error("Urls not parsed correctly")
 	}
-	fmt.Println(urls)
 }
 func TestSoft404Detection(t *testing.T) {
 	//todo: write test

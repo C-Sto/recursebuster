@@ -26,6 +26,7 @@ y
 /a/
 /a/x (200, but same body as /x (404))
 /a/y (200, but very similar body to /x (404))
+/appendslash/
 
 300
 /b -> /a/ (302)
@@ -61,7 +62,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	vMut.Unlock()
 
 	respCode := 404
-
 	switch strings.ToLower(r.URL.Path) {
 	case "/":
 		fallthrough
@@ -74,6 +74,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	case "/a/b/c":
 		fallthrough
 	case "/a/x":
+		fallthrough
+	case "/appendslash/":
 		fallthrough
 	case "/a/y":
 		respCode = 200
@@ -104,41 +106,53 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	default:
 		respCode = 404
 	}
-	w.Header().Set("Location", "cats")
-
-	w.WriteHeader(respCode)
 	bod := bod404
-	if strings.ToLower(string(r.URL.Path[len(r.URL.Path)-1])) == "x" {
+	if respCode == 200 {
+		bod = bod200
+	} else if strings.ToLower(string(r.URL.Path[len(r.URL.Path)-1])) == "x" {
 		//404 body
 		bod = bod404
-	} else if strings.ToLower(r.URL.Path[1:]) == "y" {
+	} else if strings.ToLower(string(r.URL.Path[len(r.URL.Path)-1])) == "y" {
 		//modified 404
 		bod = bod404mod
-	} else if respCode == 302 || respCode == 301 {
-		bod = ""
-	} else if respCode == 200 {
-		bod = bod200
 	}
 
-	fmt.Fprintln(w, bod)
-	/*
-		var keys []string
-		for k := range r.Header {
-			keys = append(keys, k)
+	if respCode == 302 || respCode == 301 {
+		if strings.ToLower(r.URL.Path) == "/b" {
+			w.Header().Set("Location", "/r/")
+		} else if strings.ToLower(r.URL.Path) == "/b/c" {
+			w.Header().Set("Location", "/r/b")
+		} else if strings.ToLower(r.URL.Path) == "/b/c/" {
+			w.Header().Set("Location", "/r/b/c")
+		} else if strings.ToLower(r.URL.Path) == "/b/x" {
+			w.Header().Set("Location", "/r/x")
+		} else if strings.ToLower(r.URL.Path) == "/b/y" {
+			w.Header().Set("Location", "/r/y")
 		}
-		sort.Strings(keys)
 
-		fmt.Fprintln(w, "<b>Request Headers:</b></br>", r.URL.Path[1:])
-		for _, k := range keys {
-			fmt.Fprintln(w, k, ":", r.Header[k], "</br>", r.URL.Path[1:])
-		}*/
+		bod = ""
+	}
+	w.WriteHeader(respCode)
+	fmt.Fprintln(w, bod)
+
 }
 
-func Start() {
+var testServMutex *sync.Mutex
+
+//Start starts the test HTTP server
+func Start(port string, finishedTest, setup chan struct{}) {
+	s := http.NewServeMux()
+	if testServMutex == nil {
+		testServMutex = &sync.Mutex{}
+	}
+	testServMutex.Lock()
+	defer testServMutex.Unlock()
 	visited = make(map[string]bool)
 	vMut = &sync.RWMutex{}
-	http.HandleFunc("/", handler)
-	go http.ListenAndServe("127.0.0.1:12345", nil)
+	s.HandleFunc("/", handler)
+	go http.ListenAndServe("127.0.0.1:"+port, s)
+	close(setup)
+	<-finishedTest //this is an ultra gross hack :(
 }
 
 var visited map[string]bool
