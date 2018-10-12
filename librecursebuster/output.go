@@ -12,24 +12,24 @@ import (
 )
 
 //PrintBanner prints the banner and in debug mode will also print all set options
-func PrintBanner(cfg *Config) {
+func PrintBanner() {
 	//todo: include settings in banner
-	if cfg.NoUI || cfg.ShowVersion {
+	if gState.Cfg.NoUI || gState.Cfg.ShowVersion {
 		fmt.Println(strings.Repeat("=", 20))
-		fmt.Println("recursebuster V" + cfg.Version)
+		fmt.Println("recursebuster V" + gState.Cfg.Version)
 		fmt.Println("Poorly hacked together by C_Sto (@C__Sto)")
 		fmt.Println("Heavy influence from Gograbber, thx Swarlz")
 		fmt.Println(strings.Repeat("=", 20))
-		if cfg.Debug {
-			printOpts(cfg)
+		if gState.Cfg.Debug {
+			printOpts()
 			fmt.Println(strings.Repeat("=", 20))
 		}
 	}
 }
 
 //stolen from swarlz
-func printOpts(s *Config) {
-	keys := reflect.ValueOf(s).Elem()
+func printOpts() {
+	keys := reflect.ValueOf(gState.Cfg).Elem()
 	typeOfT := keys.Type()
 	for i := 0; i < keys.NumField(); i++ {
 		f := keys.Field(i)
@@ -39,7 +39,7 @@ func printOpts(s *Config) {
 }
 
 //OutputWriter will write to a file and the screen
-func OutputWriter(cfg *Config, localPath string) {
+func OutputWriter(localPath string) {
 	//output worker
 	pages := make(map[string]bool) //keep it unique
 	file, err := os.OpenFile(localPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
@@ -50,11 +50,11 @@ func OutputWriter(cfg *Config, localPath string) {
 
 	stringToWrite := "%s %s [%s]"
 	stringToPrint := "Found %s %s [%s]"
-	if cfg.ShowLen {
+	if gState.Cfg.ShowLen {
 		stringToWrite = "%s %s [%s] Length: %v"
 		stringToPrint = "%s Found %s [%s] Length: %v"
 	}
-	if cfg.CleanOutput {
+	if gState.Cfg.CleanOutput {
 		stringToWrite = "%s"
 	}
 	for {
@@ -64,7 +64,7 @@ func OutputWriter(cfg *Config, localPath string) {
 			pages[page] = true
 			writeS := fmt.Sprintf(stringToWrite, object.Result.Request.Method, page, object.Result.Status)
 			printS := fmt.Sprintf(stringToPrint, object.Result.Request.Method, page, object.Result.Status)
-			if cfg.ShowLen {
+			if gState.Cfg.ShowLen {
 				writeS = fmt.Sprintf(stringToWrite, object.Result.Request.Method, page, object.Result.Status, object.Result.ContentLength)
 				printS = fmt.Sprintf(stringToPrint, object.Result.Request.Method, page, object.Result.Status, object.Result.ContentLength)
 			}
@@ -73,7 +73,7 @@ func OutputWriter(cfg *Config, localPath string) {
 				writeS += " " + object.Result.Header.Get("Location")
 				printS += " " + object.Result.Header.Get("Location")
 			}
-			if cfg.CleanOutput {
+			if gState.Cfg.CleanOutput {
 				writeS = fmt.Sprintf(stringToWrite, page)
 			}
 			file.WriteString(writeS + "\n")
@@ -112,7 +112,7 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int) {
 }
 
 //UIPrinter is called to write a pretty UI
-func UIPrinter(cfg *Config) {
+func UIPrinter() {
 	tick := time.NewTicker(time.Second / 30) //30 'fps'
 	testedURL := ""
 	for {
@@ -120,7 +120,7 @@ func UIPrinter(cfg *Config) {
 		case o := <-gState.Chans.printChan:
 			//something to print
 			//v.Write([]byte(o.Content + "\n"))
-			if cfg.VerboseLevel >= o.Level {
+			if gState.Cfg.VerboseLevel >= o.Level {
 				addToMainUI(o)
 			}
 			gState.wg.Done()
@@ -181,7 +181,7 @@ func writeStatus(s string) {
 }
 
 //StatusPrinter is the function that performs all the status printing logic
-func StatusPrinter(cfg *Config) {
+func StatusPrinter() {
 	tick := time.NewTicker(time.Second * 2)
 	status := getStatus()
 	spacesToClear := 0
@@ -191,12 +191,12 @@ func StatusPrinter(cfg *Config) {
 		case o := <-gState.Chans.printChan:
 			//shoudln't need to check for status here..
 			//clear the line before printing anything
-			if cfg.NoUI {
+			if gState.Cfg.NoUI {
 				fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
 			}
 
-			if cfg.VerboseLevel >= o.Level {
-				if cfg.NoUI {
+			if gState.Cfg.VerboseLevel >= o.Level {
+				if gState.Cfg.NoUI {
 					o.Type.Println(o.Content)
 					//don't need to remember spaces to clear this line - this is newline suffixed
 				} else {
@@ -217,10 +217,10 @@ func StatusPrinter(cfg *Config) {
 			testedURL = t
 		}
 
-		if !cfg.NoStatus && cfg.NoUI {
+		if !gState.Cfg.NoStatus && gState.Cfg.NoUI {
 			//assemble the status string
 			sprint := fmt.Sprintf("%s"+black.Sprint(">"), status)
-			//if cfg.MaxDirs == 1 && cfg.Wordlist != "" {
+			//if gState.Cfg.MaxDirs == 1 && gState.Cfg.Wordlist != "" {
 			//this is the grossest format string I ever did see
 			if len(gState.WordList) > 0 {
 				sprint += fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(len(gState.WordList)), testedURL)

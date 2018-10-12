@@ -10,7 +10,7 @@ import (
 )
 
 //ManageRequests handles the request workers
-func ManageRequests(cfg *Config) {
+func ManageRequests() {
 	//manages net request workers
 	for {
 		page := <-gState.Chans.pagesChan
@@ -20,17 +20,17 @@ func ManageRequests(cfg *Config) {
 			continue
 		}
 		for _, method := range gState.Methods {
-			if page.Result == nil && !cfg.NoBase {
+			if page.Result == nil && !gState.Cfg.NoBase {
 				gState.Chans.workersChan <- struct{}{}
 				gState.wg.Add(1)
-				go testURL(cfg, method, page.URL, gState.Client)
+				go testURL(method, page.URL, gState.Client)
 			}
-			if cfg.Wordlist != "" && string(page.URL[len(page.URL)-1]) == "/" { //if we are testing a directory
+			if gState.Cfg.Wordlist != "" && string(page.URL[len(page.URL)-1]) == "/" { //if we are testing a directory
 
 				//check for wildcard response
 
 				//	maxDirs <- struct{}{}
-				dirBust(cfg, page)
+				dirBust(page)
 			}
 		}
 		gState.wg.Done()
@@ -39,7 +39,7 @@ func ManageRequests(cfg *Config) {
 }
 
 //ManageNewURLs will take in any URL, and decide if it should be added to the queue for bustin', or if we discovered something new
-func ManageNewURLs(cfg *Config) {
+func ManageNewURLs() {
 	//decides on whether to add to the directory list, or add to file output
 	for {
 		candidate := <-gState.Chans.newPagesChan
@@ -64,7 +64,7 @@ func ManageNewURLs(cfg *Config) {
 		gState.CMut.Lock()
 		if _, ok := gState.Checked[actualURL]; !ok && //must have not checked it before
 			(gState.Hosts.HostExists(u.Host) || gState.Whitelist[u.Host]) && //must be within whitelist, or be one of the starting urls
-			!cfg.NoRecursion { //no recursion means we don't care about adding extra paths or content
+			!gState.Cfg.NoRecursion { //no recursion means we don't care about adding extra paths or content
 			gState.Checked[actualURL] = true
 			gState.CMut.Unlock()
 			gState.wg.Add(1)
@@ -107,7 +107,7 @@ func ManageNewURLs(cfg *Config) {
 	}
 }
 
-func testURL(cfg *Config, method string, urlString string, client *http.Client) {
+func testURL(method string, urlString string, client *http.Client) {
 	defer func() {
 		gState.wg.Done()
 		atomic.AddUint64(gState.TotalTested, 1)
@@ -116,9 +116,9 @@ func testURL(cfg *Config, method string, urlString string, client *http.Client) 
 	case gState.Chans.testChan <- method + ":" + urlString:
 	default: //this is to prevent blocking, it doesn't _really_ matter if it doesn't get written to output
 	}
-	headResp, content, good := evaluateURL(cfg, method, urlString, client)
+	headResp, content, good := evaluateURL(method, urlString, client)
 
-	if !good && !cfg.ShowAll {
+	if !good && !gState.Cfg.ShowAll {
 		return
 	}
 
@@ -131,7 +131,7 @@ func testURL(cfg *Config, method string, urlString string, client *http.Client) 
 	gState.wg.Add(1)
 	gState.Chans.confirmedChan <- SpiderPage{URL: urlString, Result: headResp, Reference: headResp.Request.URL}
 
-	if !cfg.NoSpider && good && !cfg.NoRecursion {
+	if !gState.Cfg.NoSpider && good && !gState.Cfg.NoRecursion {
 		urls, err := getUrls(content)
 		if err != nil {
 			PrintOutput(err.Error(), Error, 0)
@@ -153,7 +153,7 @@ func testURL(cfg *Config, method string, urlString string, client *http.Client) 
 	}
 }
 
-func dirBust(cfg *Config, page SpiderPage) {
+func dirBust(page SpiderPage) {
 	//ugh
 	u, err := url.Parse(page.URL)
 	if err != nil {
@@ -161,12 +161,12 @@ func dirBust(cfg *Config, page SpiderPage) {
 		return
 	}
 	//check to make sure we aren't dirbusting a wildcardyboi (NOTE!!! USES FIRST SPECIFIED MEHTOD TO DO SOFT 404!)
-	if !cfg.NoWildcardChecks {
+	if !gState.Cfg.NoWildcardChecks {
 		gState.Chans.workersChan <- struct{}{}
-		h, _, res := evaluateURL(cfg, gState.Methods[0], page.URL+RandString(), gState.Client)
+		h, _, res := evaluateURL(gState.Methods[0], page.URL+RandString(), gState.Client)
 
 		if res { //true response indicates a good response for a guid path, unlikely good
-			if detectSoft404(h, gState.Hosts.Get404(u.Host), cfg.Ratio404) {
+			if detectSoft404(h, gState.Hosts.Get404(u.Host), gState.Cfg.Ratio404) {
 				//it's a soft404 probably, guess we can continue (this logic seems wrong??)
 			} else {
 				PrintOutput(
@@ -177,7 +177,7 @@ func dirBust(cfg *Config, page SpiderPage) {
 		}
 	}
 
-	if !cfg.NoStartStop {
+	if !gState.Cfg.NoStartStop {
 		PrintOutput(
 			fmt.Sprintf("Dirbusting %s", page.URL),
 			Info, 0,
@@ -196,7 +196,7 @@ func dirBust(cfg *Config, page SpiderPage) {
 		select {
 		case <-gState.StopDir:
 			//<-maxDirs
-			if !cfg.NoStartStop {
+			if !gState.Cfg.NoStartStop {
 				PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0)
 			}
 			return
@@ -210,17 +210,17 @@ func dirBust(cfg *Config, page SpiderPage) {
 						}
 						gState.Chans.workersChan <- struct{}{}
 						gState.wg.Add(1)
-						go testURL(cfg, method, page.URL+word+"."+ext, gState.Client)
+						go testURL(method, page.URL+word+"."+ext, gState.Client)
 						tested[page.URL+word+"."+ext] = true
 					}
 				}
-				if cfg.AppendDir {
+				if gState.Cfg.AppendDir {
 					if tested[page.URL+word+"/"] {
 						continue
 					}
 					gState.Chans.workersChan <- struct{}{}
 					gState.wg.Add(1)
-					go testURL(cfg, method, page.URL+word+"/", gState.Client)
+					go testURL(method, page.URL+word+"/", gState.Client)
 					tested[page.URL+word+"/"] = true
 				}
 				if tested[page.URL+word] {
@@ -228,27 +228,27 @@ func dirBust(cfg *Config, page SpiderPage) {
 				}
 				gState.Chans.workersChan <- struct{}{}
 				gState.wg.Add(1)
-				go testURL(cfg, method, page.URL+word, gState.Client)
+				go testURL(method, page.URL+word, gState.Client)
 				tested[page.URL+word] = true
-				//if cfg.MaxDirs == 1 {
+				//if gState.Cfg.MaxDirs == 1 {
 				atomic.AddUint32(gState.DirbProgress, 1)
 				//}
 			}
 		}
 	}
 	//<-maxDirs
-	if !cfg.NoStartStop {
+	if !gState.Cfg.NoStartStop {
 		PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0)
 	}
 }
 
-func StartBusting(cfg *Config, randURL string, u url.URL) {
+func StartBusting(randURL string, u url.URL) {
 	defer gState.wg.Done()
-	if !cfg.NoWildcardChecks {
-		resp, err := HTTPReq("GET", randURL, gState.Client, cfg)
+	if !gState.Cfg.NoWildcardChecks {
+		resp, err := HTTPReq("GET", randURL, gState.Client)
 		<-gState.Chans.workersChan
 		if err != nil {
-			if cfg.InputList != "" {
+			if gState.Cfg.InputList != "" {
 				PrintOutput(
 					err.Error(),
 					Error,

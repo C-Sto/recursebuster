@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,21 +15,19 @@ const localURL = "http://localhost:12345/"
 
 func TestBasicFunctionality(t *testing.T) {
 
-	cfg := &Config{}
-
 	//the state should probably change per different host.. eventually
 	globalState := State{}.Init()
 	globalState.Hosts.Init()
 
 	testserver.Start()
 
-	cfg.URL = localURL
+	globalState.Cfg.URL = localURL
 
-	urlSlice := getURLSlice(cfg)
+	urlSlice := getURLSlice(globalState)
 
-	setupConfig(cfg, globalState, urlSlice[0])
+	setupConfig(globalState, urlSlice[0])
 
-	setupState(globalState, cfg)
+	SetupState(globalState)
 
 	wordlist := `a
 b
@@ -44,10 +41,12 @@ z
 
 	globalState.WordList = strings.Split(wordlist, "\n")
 
-	cfg.Wordlist = "test"
+	globalState.Cfg.Wordlist = "test"
 
-	go ManageRequests(cfg)
-	go ManageNewURLs(cfg)
+	globalState.DirbProgress = new(uint32)
+
+	go ManageRequests()
+	go ManageNewURLs()
 
 	u, err := url.Parse(urlSlice[0])
 	if err != nil {
@@ -58,10 +57,10 @@ z
 	if len(prefix) > 0 && string(prefix[len(prefix)-1]) != "/" {
 		prefix = prefix + "/"
 	}
-	randURL := fmt.Sprintf("%s%s", prefix, cfg.Canary)
+	randURL := fmt.Sprintf("%s%s", prefix, globalState.Cfg.Canary)
 	globalState.AddWG()
 	gState.Chans.GetWorkers() <- struct{}{}
-	go StartBusting(cfg, randURL, *u)
+	go StartBusting(randURL, *u)
 
 	go func() {
 		for {
@@ -130,53 +129,53 @@ z
 
 }
 
-func setupConfig(cfg *Config, globalState *State, urlSliceZero string) {
-	cfg.Version = "TEST"
+func setupConfig(globalState *State, urlSliceZero string) {
+	globalState.Cfg.Version = "TEST"
 	totesTested := uint64(0)
 	globalState.TotalTested = &totesTested
-	cfg.ShowAll = false
-	cfg.AppendDir = true
-	cfg.Auth = ""
-	cfg.BadResponses = "404"
-	//cfg.BadHeader, "Check for presence of this header. If an exact match is found"
-	//cfg.BodyContent, ""
-	cfg.BlacklistLocation = ""
-	cfg.Canary = ""
-	cfg.CleanOutput = false
-	cfg.Cookies = ""
-	cfg.Debug = false
-	//cfg.MaxDirs = 1
-	cfg.Extensions = ""
-	//cfg.Headers = "Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'")
-	cfg.HTTPS = false
-	cfg.InputList = ""
-	cfg.SSLIgnore = false
-	cfg.ShowLen = false
-	cfg.NoBase = false
-	cfg.NoGet = false
-	cfg.NoHead = false
-	cfg.NoRecursion = false
-	cfg.NoSpider = false
-	cfg.NoStatus = false
-	cfg.NoStartStop = false
-	cfg.NoWildcardChecks = false
-	cfg.NoUI = true
-	cfg.Localpath = "." + string(os.PathSeparator) + "busted.txt"
-	cfg.Methods = "GET"
-	cfg.ProxyAddr = ""
-	cfg.Ratio404 = 0.95
-	cfg.FollowRedirects = false
-	cfg.BurpMode = false
-	cfg.Threads = 1
-	cfg.Timeout = 20
-	cfg.URL = ""
-	cfg.Agent = "RecurseBuster/" + cfg.Version
-	cfg.VerboseLevel = 0
-	cfg.ShowVersion = false
-	cfg.Wordlist = ""
-	cfg.WhitelistLocation = ""
+	globalState.Cfg.ShowAll = false
+	globalState.Cfg.AppendDir = true
+	globalState.Cfg.Auth = ""
+	globalState.Cfg.BadResponses = "404"
+	//globalState.Cfg.BadHeader, "Check for presence of this header. If an exact match is found"
+	//globalState.Cfg.BodyContent, ""
+	globalState.Cfg.BlacklistLocation = ""
+	globalState.Cfg.Canary = ""
+	globalState.Cfg.CleanOutput = false
+	globalState.Cfg.Cookies = ""
+	globalState.Cfg.Debug = false
+	//globalState.Cfg.MaxDirs = 1
+	globalState.Cfg.Extensions = ""
+	//globalState.Cfg.Headers = "Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'")
+	globalState.Cfg.HTTPS = false
+	globalState.Cfg.InputList = ""
+	globalState.Cfg.SSLIgnore = false
+	globalState.Cfg.ShowLen = false
+	globalState.Cfg.NoBase = false
+	globalState.Cfg.NoGet = false
+	globalState.Cfg.NoHead = false
+	globalState.Cfg.NoRecursion = false
+	globalState.Cfg.NoSpider = false
+	globalState.Cfg.NoStatus = false
+	globalState.Cfg.NoStartStop = false
+	globalState.Cfg.NoWildcardChecks = false
+	globalState.Cfg.NoUI = true
+	globalState.Cfg.Localpath = "." + string(os.PathSeparator) + "busted.txt"
+	globalState.Cfg.Methods = "GET"
+	globalState.Cfg.ProxyAddr = ""
+	globalState.Cfg.Ratio404 = 0.95
+	globalState.Cfg.FollowRedirects = false
+	globalState.Cfg.BurpMode = false
+	globalState.Cfg.Threads = 1
+	globalState.Cfg.Timeout = 20
+	globalState.Cfg.URL = ""
+	globalState.Cfg.Agent = "RecurseBuster/" + globalState.Cfg.Version
+	globalState.Cfg.VerboseLevel = 0
+	globalState.Cfg.ShowVersion = false
+	globalState.Cfg.Wordlist = ""
+	globalState.Cfg.WhitelistLocation = ""
 
-	cfg.URL = localURL
+	globalState.Cfg.URL = localURL
 
 	var h *url.URL
 	var err error
@@ -186,7 +185,7 @@ func setupConfig(cfg *Config, globalState *State, urlSliceZero string) {
 	}
 
 	if h.Scheme == "" {
-		if cfg.HTTPS {
+		if globalState.Cfg.HTTPS {
 			h, err = url.Parse("https://" + urlSliceZero)
 		} else {
 			h, err = url.Parse("http://" + urlSliceZero)
@@ -197,52 +196,8 @@ func setupConfig(cfg *Config, globalState *State, urlSliceZero string) {
 	}
 	globalState.Hosts.AddHost(h)
 
-	if cfg.Canary == "" {
-		cfg.Canary = RandString()
+	if globalState.Cfg.Canary == "" {
+		globalState.Cfg.Canary = RandString()
 	}
 
-}
-
-func setupState(globalState *State, cfg *Config) {
-	for _, x := range strings.Split(cfg.Extensions, ",") {
-		globalState.Extensions = append(globalState.Extensions, x)
-	}
-
-	for _, x := range strings.Split(cfg.Methods, ",") {
-		globalState.Methods = append(globalState.Methods, x)
-	}
-
-	for _, x := range strings.Split(cfg.BadResponses, ",") {
-		i, err := strconv.Atoi(x)
-		if err != nil {
-			panic(err)
-		}
-		globalState.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
-	}
-
-	globalState.Client = ConfigureHTTPClient(cfg, false)
-	globalState.BurpClient = ConfigureHTTPClient(cfg, true)
-
-	globalState.Version = cfg.Version
-
-	// && cfg.MaxDirs == 1 {
-
-	zerod := uint32(0)
-	globalState.DirbProgress = &zerod
-
-	//	zero := uint32(0)
-	//	globalState.WordlistLen = &zero
-
-	globalState.StartTime = time.Now()
-	globalState.PerSecondShort = new(uint64)
-	globalState.PerSecondLong = new(uint64)
-
-	SetState(globalState)
-}
-func getURLSlice(cfg *Config) []string {
-	urlSlice := []string{}
-	if cfg.URL != "" {
-		urlSlice = append(urlSlice, cfg.URL)
-	}
-	return urlSlice
 }

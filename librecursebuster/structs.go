@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -132,6 +134,7 @@ type State struct {
 	//global State values
 	Client         *http.Client
 	BurpClient     *http.Client
+	Cfg            *Config
 	TotalTested    *uint64
 	PerSecondShort *uint64 //how many tested over 2 seconds or so
 	PerSecondLong  *uint64
@@ -180,6 +183,7 @@ func (State) Init() *State {
 		StartTime:      time.Now(),
 		PerSecondShort: new(uint64),
 		PerSecondLong:  new(uint64),
+		Cfg:            &Config{},
 	}
 	return s
 }
@@ -308,4 +312,69 @@ type SpiderPage struct {
 	URL       string
 	Result    *http.Response
 	Reference *url.URL //where did we get this URL from? (for the logic portion)
+}
+
+func SetupState(globalState *State) {
+	SetState(globalState)
+	for _, x := range strings.Split(globalState.Cfg.Extensions, ",") {
+		globalState.Extensions = append(globalState.Extensions, x)
+	}
+
+	for _, x := range strings.Split(globalState.Cfg.Methods, ",") {
+		globalState.Methods = append(globalState.Methods, x)
+	}
+
+	for _, x := range strings.Split(globalState.Cfg.BadResponses, ",") {
+		i, err := strconv.Atoi(x)
+		if err != nil {
+			panic(err)
+		}
+		globalState.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
+	}
+
+	globalState.Client = ConfigureHTTPClient(false)
+	globalState.BurpClient = ConfigureHTTPClient(true)
+
+	globalState.Version = globalState.Cfg.Version
+
+	if globalState.Cfg.BlacklistLocation != "" {
+		readerChan := make(chan string, 100)
+		go LoadWords(globalState.Cfg.BlacklistLocation, readerChan)
+		for x := range readerChan {
+			globalState.Blacklist[x] = true
+		}
+	}
+
+	if globalState.Cfg.WhitelistLocation != "" {
+		readerChan := make(chan string, 100)
+		go LoadWords(globalState.Cfg.WhitelistLocation, readerChan)
+		for x := range readerChan {
+			globalState.Whitelist[x] = true
+		}
+	}
+
+	if globalState.Cfg.Wordlist != "" { // && globalState.Cfg.MaxDirs == 1 {
+
+		zerod := uint32(0)
+		globalState.DirbProgress = &zerod
+
+		readerChan := make(chan string, 100)
+		go LoadWords(globalState.Cfg.Wordlist, readerChan)
+		for v := range readerChan {
+			globalState.WordList = append(globalState.WordList, v)
+			//atomic.AddUint32(globalState.WordlistLen, 1)
+		}
+	}
+
+	globalState.StartTime = time.Now()
+	globalState.PerSecondShort = new(uint64)
+	globalState.PerSecondLong = new(uint64)
+
+}
+func getURLSlice(globalState *State) []string {
+	urlSlice := []string{}
+	if globalState.Cfg.URL != "" {
+		urlSlice = append(urlSlice, globalState.Cfg.URL)
+	}
+	return urlSlice
 }
