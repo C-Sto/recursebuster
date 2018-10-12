@@ -94,6 +94,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	case "/y":
 		respCode = 404
 	case "/a/b/c/":
+		fallthrough
+	case "/a/b/c/basicauth":
 		respCode = 401
 	case "/a/b/c/d":
 		respCode = 403
@@ -115,6 +117,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	} else if strings.ToLower(string(r.URL.Path[len(r.URL.Path)-1])) == "y" {
 		//modified 404
 		bod = bod404mod
+	}
+
+	if respCode == 401 {
+		if u, p, ok := r.BasicAuth(); strings.ToLower(string(r.URL.Path[len(r.URL.Path)-1])) == "basicauth" &&
+			ok && u == "test" && p == "test" {
+			respCode = 200
+		}
 	}
 
 	if respCode == 302 || respCode == 301 {

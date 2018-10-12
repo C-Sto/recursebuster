@@ -42,22 +42,6 @@ const localURL = "http://localhost:"
 
 */
 
-func TestAppendSlash(t *testing.T) {
-	//add an appendslash value to the wordlist that should _only_ be found if the appendslash var is set
-	finished := make(chan struct{})
-	urlSlice := preSetupTest(nil, "2002", finished)
-	gState.Cfg.AppendDir = true
-	gState.WordList = append(gState.WordList, "appendslash")
-	found := postSetupTest(urlSlice)
-
-	gState.Wait()
-
-	if x, ok := found["/appendslash/"]; !ok || !x {
-		panic("didn't find it?")
-	}
-	close(finished)
-}
-
 func TestBasicFunctionality(t *testing.T) {
 
 	finished := make(chan struct{})
@@ -113,6 +97,36 @@ func TestBasicFunctionality(t *testing.T) {
 		}
 	}
 	close(finished)
+}
+
+func TestAppendSlash(t *testing.T) {
+	//add an appendslash value to the wordlist that should _only_ be found if the appendslash var is set
+	finished := make(chan struct{})
+	urlSlice := preSetupTest(nil, "2002", finished)
+	gState.Cfg.AppendDir = true
+	gState.WordList = append(gState.WordList, "appendslash")
+	found := postSetupTest(urlSlice)
+	gState.Wait()
+
+	if x, ok := found["/appendslash/"]; !ok || !x {
+		panic("didn't find it?")
+	}
+	close(finished)
+}
+
+func TestBasicAuth(t *testing.T) {
+	//ensure that basic auth checks are found
+	finished := make(chan struct{})
+	urlSlice := preSetupTest(nil, "2002", finished)
+	gState.Cfg.Auth = "dGVzdDp0ZXN0"
+	gState.WordList = append(gState.WordList, "basicauth")
+	found := postSetupTest(urlSlice)
+	gState.Wait()
+
+	if x, ok := found["/a/b/c/basicauth"]; !ok || !x {
+		panic("Failed basic auth test!")
+	}
+
 }
 
 func postSetupTest(urlSlice []string) (found map[string]bool) {
