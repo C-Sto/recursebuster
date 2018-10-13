@@ -151,8 +151,14 @@ func evaluateURL(method string, urlString string, client *http.Client) (headResp
 	if len(gState.Cfg.BadHeader) > 0 {
 		for _, x := range gState.Cfg.BadHeader {
 			spl := strings.Split(x, ":")
-			if strings.HasPrefix(headResp.Header.Get(spl[0]), strings.Join(spl[1:], ":")) {
-				return headResp, content, false
+			//check headers for key
+			if headResp.Header.Get(spl[0]) != "" {
+				//key exists. Check value matches prefix provided in the input
+				a := strings.TrimSpace(headResp.Header.Get(spl[0]))
+				b := strings.TrimSpace(spl[1])
+				if strings.HasPrefix(a, b) || strings.Compare(a, b) == 0 {
+					return headResp, content, false
+				}
 			}
 		}
 	}

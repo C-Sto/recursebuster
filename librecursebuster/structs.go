@@ -10,9 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jroimartin/gocui"
-
 	"github.com/fatih/color"
+	"github.com/jroimartin/gocui"
 )
 
 //All the ConsoleWriter stuff can probably be abstracted into an interface :thinkingemoji:
@@ -186,6 +185,7 @@ func (State) Init() *State {
 		StartTime:      time.Now(),
 		PerSecondShort: new(uint64),
 		PerSecondLong:  new(uint64),
+		TotalTested:    new(uint64),
 		Cfg:            &Config{},
 	}
 	return s
@@ -320,59 +320,60 @@ type SpiderPage struct {
 //SetupState will perform all the basic state setup functions (adding URL's to the blacklist etc)
 func SetupState(globalState *State) {
 	SetState(globalState)
-	for _, x := range strings.Split(globalState.Cfg.Extensions, ",") {
-		globalState.Extensions = append(globalState.Extensions, x)
+	for _, x := range strings.Split(gState.Cfg.Extensions, ",") {
+		gState.Extensions = append(gState.Extensions, x)
 	}
 
-	for _, x := range strings.Split(globalState.Cfg.Methods, ",") {
-		globalState.Methods = append(globalState.Methods, x)
+	for _, x := range strings.Split(gState.Cfg.Methods, ",") {
+		gState.Methods = append(gState.Methods, x)
 	}
 
-	for _, x := range strings.Split(globalState.Cfg.BadResponses, ",") {
+	for _, x := range strings.Split(gState.Cfg.BadResponses, ",") {
 		i, err := strconv.Atoi(x)
 		if err != nil {
+			fmt.Println("Bad error code supplied!")
 			panic(err)
 		}
-		globalState.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
+		gState.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
 	}
 
-	globalState.Client = ConfigureHTTPClient(false)
-	globalState.BurpClient = ConfigureHTTPClient(true)
+	gState.Client = ConfigureHTTPClient(false)
+	gState.BurpClient = ConfigureHTTPClient(true)
 
-	globalState.Version = globalState.Cfg.Version
+	gState.Version = gState.Cfg.Version
 
-	if globalState.Cfg.BlacklistLocation != "" {
+	if gState.Cfg.BlacklistLocation != "" {
 		readerChan := make(chan string, 100)
-		go LoadWords(globalState.Cfg.BlacklistLocation, readerChan)
+		go LoadWords(gState.Cfg.BlacklistLocation, readerChan)
 		for x := range readerChan {
-			globalState.Blacklist[x] = true
+			gState.Blacklist[x] = true
 		}
 	}
 
-	if globalState.Cfg.WhitelistLocation != "" {
+	if gState.Cfg.WhitelistLocation != "" {
 		readerChan := make(chan string, 100)
-		go LoadWords(globalState.Cfg.WhitelistLocation, readerChan)
+		go LoadWords(gState.Cfg.WhitelistLocation, readerChan)
 		for x := range readerChan {
-			globalState.Whitelist[x] = true
+			gState.Whitelist[x] = true
 		}
 	}
 
-	if globalState.Cfg.Wordlist != "" { // && globalState.Cfg.MaxDirs == 1 {
+	if gState.Cfg.Wordlist != "" { // && gState.Cfg.MaxDirs == 1 {
 
 		zerod := uint32(0)
-		globalState.DirbProgress = &zerod
+		gState.DirbProgress = &zerod
 
 		readerChan := make(chan string, 100)
-		go LoadWords(globalState.Cfg.Wordlist, readerChan)
+		go LoadWords(gState.Cfg.Wordlist, readerChan)
 		for v := range readerChan {
-			globalState.WordList = append(globalState.WordList, v)
-			//atomic.AddUint32(globalState.WordlistLen, 1)
+			gState.WordList = append(gState.WordList, v)
+			//atomic.AddUint32(gState.WordlistLen, 1)
 		}
 	}
 
-	globalState.StartTime = time.Now()
-	globalState.PerSecondShort = new(uint64)
-	globalState.PerSecondLong = new(uint64)
+	gState.StartTime = time.Now()
+	gState.PerSecondShort = new(uint64)
+	gState.PerSecondLong = new(uint64)
 
 }
 func getURLSlice(globalState *State) []string {

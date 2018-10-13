@@ -45,7 +45,8 @@ const localURL = "http://localhost:"
 func TestBasicFunctionality(t *testing.T) {
 
 	finished := make(chan struct{})
-	urlSlice := preSetupTest(nil, "2001", finished)
+	cfg := getDefaultConfig()
+	urlSlice := preSetupTest(cfg, "2001", finished)
 	found := postSetupTest(urlSlice)
 
 	//waitgroup check (if test times out, the waitgroup is broken... somewhere)
@@ -102,7 +103,8 @@ func TestBasicFunctionality(t *testing.T) {
 func TestAppendSlash(t *testing.T) {
 	//add an appendslash value to the wordlist that should _only_ be found if the appendslash var is set
 	finished := make(chan struct{})
-	urlSlice := preSetupTest(nil, "2002", finished)
+	cfg := getDefaultConfig()
+	urlSlice := preSetupTest(cfg, "2002", finished)
 	gState.Cfg.AppendDir = true
 	gState.WordList = append(gState.WordList, "appendslash")
 	found := postSetupTest(urlSlice)
@@ -117,14 +119,53 @@ func TestAppendSlash(t *testing.T) {
 func TestBasicAuth(t *testing.T) {
 	//ensure that basic auth checks are found
 	finished := make(chan struct{})
-	urlSlice := preSetupTest(nil, "2002", finished)
-	gState.Cfg.Auth = "dGVzdDp0ZXN0"
+	cfg := getDefaultConfig()
+	cfg.Auth = "dGVzdDp0ZXN0"
+	urlSlice := preSetupTest(cfg, "2003", finished)
 	gState.WordList = append(gState.WordList, "basicauth")
 	found := postSetupTest(urlSlice)
 	gState.Wait()
 
 	if x, ok := found["/a/b/c/basicauth"]; !ok || !x {
 		panic("Failed basic auth test!")
+	}
+
+}
+
+func TestBadCodes(t *testing.T) {
+	//ensure that basic auth checks are found
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.BadResponses = "404,500"
+	urlSlice := preSetupTest(cfg, "2004", finished)
+	gState.WordList = append(gState.WordList, "badcode")
+	found := postSetupTest(urlSlice)
+	gState.Wait()
+
+	for x := range found {
+		if strings.Contains(x, "badcode") {
+			panic("Failed bad header code test")
+		}
+	}
+
+}
+
+func TestBadHeaders(t *testing.T) {
+	//ensure that basic auth checks are found
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.BadHeader = ArrayStringFlag{}
+	cfg.BadHeader.Set("X-Bad-Header: test123")
+	fmt.Println(cfg.BadHeader)
+	urlSlice := preSetupTest(cfg, "2005", finished)
+	gState.WordList = append(gState.WordList, "badheader")
+	found := postSetupTest(urlSlice)
+	gState.Wait()
+
+	for x := range found {
+		if strings.Contains(x, "badheader") {
+			panic("Failed bad header code test")
+		}
 	}
 
 }
@@ -189,6 +230,9 @@ func preSetupTest(cfg *Config, servPort string, finished chan struct{}) (urlSlic
 
 	//basic state setup
 	globalState := State{}.Init()
+	if cfg != nil {
+		globalState.Cfg = cfg
+	}
 	globalState.Hosts.Init()
 
 	//start the test server
@@ -225,57 +269,56 @@ z
 	return
 }
 
-func setupConfig(globalState *State, urlSliceZero string, cfg *Config) {
-	globalState.Cfg.Version = "TEST"
-	totesTested := uint64(0)
-	globalState.TotalTested = &totesTested
-	globalState.Cfg.ShowAll = false
-	globalState.Cfg.AppendDir = true
-	globalState.Cfg.Auth = ""
-	globalState.Cfg.BadResponses = "404"
-	//globalState.Cfg.BadHeader, "Check for presence of this header. If an exact match is found"
-	//globalState.Cfg.BodyContent, ""
-	globalState.Cfg.BlacklistLocation = ""
-	globalState.Cfg.Canary = ""
-	globalState.Cfg.CleanOutput = false
-	globalState.Cfg.Cookies = ""
-	globalState.Cfg.Debug = false
-	//globalState.Cfg.MaxDirs = 1
-	globalState.Cfg.Extensions = ""
-	//globalState.Cfg.Headers = "Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'")
-	globalState.Cfg.HTTPS = false
-	globalState.Cfg.InputList = ""
-	globalState.Cfg.SSLIgnore = false
-	globalState.Cfg.ShowLen = false
-	globalState.Cfg.NoBase = false
-	globalState.Cfg.NoGet = false
-	globalState.Cfg.NoHead = false
-	globalState.Cfg.NoRecursion = false
-	globalState.Cfg.NoSpider = false
-	globalState.Cfg.NoStatus = false
-	globalState.Cfg.NoStartStop = false
-	globalState.Cfg.NoWildcardChecks = false
-	globalState.Cfg.NoUI = true
-	globalState.Cfg.Localpath = "." + string(os.PathSeparator) + "busted.txt"
-	globalState.Cfg.Methods = "GET"
-	globalState.Cfg.ProxyAddr = ""
-	globalState.Cfg.Ratio404 = 0.95
-	globalState.Cfg.FollowRedirects = false
-	globalState.Cfg.BurpMode = false
-	globalState.Cfg.Threads = 1
-	globalState.Cfg.Timeout = 20
-	globalState.Cfg.URL = ""
-	globalState.Cfg.Agent = "RecurseBuster/" + globalState.Cfg.Version
-	globalState.Cfg.VerboseLevel = 0
-	globalState.Cfg.ShowVersion = false
-	globalState.Cfg.Wordlist = ""
-	globalState.Cfg.WhitelistLocation = ""
+func getDefaultConfig() *Config {
+	return &Config{
+		Version:      "TEST",
+		ShowAll:      false,
+		AppendDir:    true,
+		Auth:         "",
+		BadResponses: "404",
+		BadHeader:    nil, //ArrayStringFlag{} // "" // "Check for presence of this header. If an exact match is found"
+		//BodyContent, ""
+		BlacklistLocation: "",
+		Canary:            "",
+		CleanOutput:       false,
+		Cookies:           "",
+		Debug:             false,
+		//MaxDirs: 1
+		Extensions:        "",
+		Headers:           nil, // "Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'")
+		HTTPS:             false,
+		InputList:         "",
+		SSLIgnore:         false,
+		ShowLen:           false,
+		NoBase:            false,
+		NoGet:             false,
+		NoHead:            false,
+		NoRecursion:       false,
+		NoSpider:          false,
+		NoStatus:          false,
+		NoStartStop:       false,
+		NoWildcardChecks:  false,
+		NoUI:              true,
+		Localpath:         "." + string(os.PathSeparator) + "busted.txt",
+		Methods:           "GET",
+		ProxyAddr:         "",
+		Ratio404:          0.95,
+		FollowRedirects:   false,
+		BurpMode:          false,
+		Threads:           1,
+		Timeout:           20,
+		Agent:             "RecurseBuster/" + "TESTING",
+		VerboseLevel:      0,
+		ShowVersion:       false,
+		Wordlist:          "",
+		WhitelistLocation: "",
 
-	globalState.Cfg.URL = localURL
-
-	if cfg != nil {
-		globalState.Cfg = cfg
+		URL: localURL,
 	}
+
+}
+
+func setupConfig(globalState *State, urlSliceZero string, cfg *Config) {
 
 	var h *url.URL
 	var err error

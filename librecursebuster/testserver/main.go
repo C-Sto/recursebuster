@@ -77,6 +77,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		fallthrough
 	case "/appendslash/":
 		fallthrough
+	case "/badheader/":
+		fallthrough
 	case "/a/y":
 		respCode = 200
 	case "/b":
@@ -102,6 +104,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	case "/c":
 		fallthrough
 	case "/c/":
+		fallthrough
+	case "/c/badcode":
 		respCode = 500
 	case "/c/d":
 		respCode = 666
@@ -141,21 +145,17 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 		bod = ""
 	}
+	if strings.ToLower(r.URL.Path) == "/badheader/" {
+		w.Header().Add("X-Bad-Header", "test123")
+	}
 	w.WriteHeader(respCode)
 	fmt.Fprintln(w, bod)
 
 }
 
-var testServMutex *sync.Mutex
-
 //Start starts the test HTTP server
 func Start(port string, finishedTest, setup chan struct{}) {
 	s := http.NewServeMux()
-	if testServMutex == nil {
-		testServMutex = &sync.Mutex{}
-	}
-	testServMutex.Lock()
-	defer testServMutex.Unlock()
 	visited = make(map[string]bool)
 	vMut = &sync.RWMutex{}
 	s.HandleFunc("/", handler)
