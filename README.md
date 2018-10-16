@@ -2,7 +2,7 @@
 
 [![Go Basic Checks](https://goreportcard.com/badge/github.com/c-sto/recursebuster)](https://goreportcard.com/report/github.com/c-sto/recursebuster)
 
-![alt-text](screen.gif "Test")
+![screengrab of tool running](screen.gif "Test")
 
 It's like gobuster, but recursive!
 
