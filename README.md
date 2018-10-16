@@ -6,7 +6,7 @@
 
 It's like gobuster, but recursive!
 
-I wanted a recursive directory brute forcer that was fast, and had certain features. It didn't exist, so I started writing this. In reality, I'll probably merge a lot of the functionality into github.com/swarley7/gograbber since that solves a similar problem and has cool features that I don't want to implement (phantomjs, ugh). For now, here it be!
+I wanted a recursive directory brute forcer that was fast, and had certain features (like header blacklisting, and recursion). It didn't exist, so I started writing this. In reality, I'll probably merge a lot of the functionality into github.com/swarley7/gograbber since that solves a similar problem and has cool features that I don't want to implement (phantomjs, ugh). For now, it will do.
 
 ## Installation
 
@@ -44,7 +44,7 @@ For servers the support it, HEAD based checks speed up content discovery conside
 
 ### Recursion
 
-When a directory is identified, it gets added to the queue to be brute-forced. By default, one directory is brute-forced at a time, mostly for sanity checks, but this can be increased to as many as you like using the `-dirs x` flag. This won't increase the speed, and will disable some of the status output features.
+When a directory is identified, it gets added to the queue to be brute-forced. By default, one directory is brute-forced at a time, however you can 'cancel' a directory interactively by hitting 'ctrl+x' if in UI mode. If you're not in UI mode (`-noui`), you need to have added the directory to the blacklist.
 
 ### Spider Assistance
 
@@ -60,9 +60,11 @@ The ability to use a proxy is fairly useful in several situations. Not having to
 
 ## Usage args
 
-Idk why you might want these, just run it with `-h` and grep for the keyword. Here they are anyway:
+Idk why you might want these, just run it with `-h 2>&1` and grep for the keyword. Here they are anyway:
 
 ```
+  -ajax
+        Add the X-Requested-With: XMLHttpRequest header to all requests
   -all
         Show, and write the result of all checks
   -appendslash
@@ -70,7 +72,9 @@ Idk why you might want these, just run it with `-h` and grep for the keyword. He
   -auth string
         Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.
   -bad string
-        Responses to consider 'bad' or 'not found'. Comma-separated This works the opposite way of gobuster! (default "404")
+        Responses to consider 'bad' or 'not found'. Comma-separated. This works the opposite way of gobuster! (default "404")
+  -badheader value
+        Check for presence of this header. If an exact match is found, the response is considered bad.Supply as key:value. Can specify multiple - eg '-badheader Location:cats -badheader X-ATT-DeviceId:XXXXX'
   -blacklist string
         Blacklist of prefixes to not check. Will not check on exact matches.
   -canary string
@@ -81,8 +85,6 @@ Idk why you might want these, just run it with `-h` and grep for the keyword. He
         Any cookies to include with requests. This is smashed into the cookies header, so copy straight from burp I guess.
   -debug
         Enable debugging
-  -dirs int
-        Maximum directories to perform busting on concurrently NOTE: directories will still be brute forced, this setting simply directs how many should be concurrently bruteforced (default 1)
   -ext string
         Extensions to append to checks. Multiple extensions can be specified, comma separate them.
   -headers value
@@ -94,16 +96,28 @@ Idk why you might want these, just run it with `-h` and grep for the keyword. He
   -k    Ignore SSL check
   -len
         Show, and write the length of the response
+  -methods string
+        Methods to use for checks. Multiple methods can be specified, comma separate them. Requests will be sent with an empty body (unless body is specified) (default "GET")
+  -nobase
+        Don't perform a request to the base URL
   -noget
         Do not perform a GET request (only use HEAD request/response)
+  -nohead
+        Don't optimize GET requests with a HEAD (only send the GET)
   -norecursion
         Disable recursion, just work on the specified directory. Also disables spider function.
   -nospider
         Don't search the page body for links, and directories to add to the spider queue.
+  -nostartstop
+        Don't show start/stop info messages
   -nostatus
         Don't print status info (for if it messes with the terminal)
+  -noui
+        Don't use sexy ui
+  -nowildcard
+        Don't perform wildcard checks for soft 404 detection
   -o string
-        Local file to dump into (default ".\\busted.txt")
+        Local file to dump into (default "./busted.txt")
   -proxy string
         Proxy configuration options in the form ip:port eg: 127.0.0.1:9050. Note! If you want this to work with burp/use it with a HTTP proxy, specify as http://ip:port
   -ratio float
@@ -111,8 +125,7 @@ Idk why you might want these, just run it with `-h` and grep for the keyword. He
   -redirect
         Follow redirects
   -sitemap
-        Send 'good' requests to the configured proxy. Requires the proxy flag to be set. ***NOTE: with this option, the proxy is ONLY used for good requests - all other requests
-go out as normal!***
+        Send 'good' requests to the configured proxy. Requires the proxy flag to be set. ***NOTE: with this option, the proxy is ONLY used for good requests - all other requests go out as normal!***
   -t int
         Number of concurrent threads (default 1)
   -timeout int
@@ -120,7 +133,7 @@ go out as normal!***
   -u string
         Url to spider
   -ua string
-        User agent to use when sending requests. (default "RecurseBuster/1.1.0")
+        User agent to use when sending requests. (default "RecurseBuster/1.5.11")
   -v int
         Verbosity level for output messages.
   -version
