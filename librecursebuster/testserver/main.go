@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"testing"
+	"time"
 )
 
 /*wordlist
@@ -56,7 +58,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	//if it's been visited more than once, instant fail
 	if visited[r.Method+":"+r.URL.Path] && r.URL.Path != "/" {
 		//we can visit the base url more than once
-		//panic("Path visited more than once: " + r.Method + ":" + r.URL.Path)
+		tes.Fail()
+		panic("Path visited more than once: " + r.Method + ":" + r.URL.Path)
 	}
 	visited[r.Method+":"+r.URL.Path] = true
 	vMut.Unlock()
@@ -172,13 +175,31 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(r.Method, r.URL, respCode, bod)
 }
 
+var tes *testing.T
+
 //Start starts the test HTTP server
-func Start(port string, finishedTest, setup chan struct{}) {
+func Start(port string, finishedTest, setup chan struct{}, t *testing.T) {
 	s := http.NewServeMux()
 	visited = make(map[string]bool)
 	vMut = &sync.RWMutex{}
+	tes = t
 	s.HandleFunc("/", handler)
 	go http.ListenAndServe("127.0.0.1:"+port, s)
+
+	for {
+		time.Sleep(time.Second * 1)
+		resp, err := http.Get("http://localhost:" + port)
+		if err != nil {
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			continue
+		}
+		// Reached this point: server is up and running!
+		break
+	}
+
 	close(setup)
 	<-finishedTest //this is an ultra gross hack :(
 }

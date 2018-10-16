@@ -11,7 +11,6 @@ import (
 //StartUI is called to begin the UI... stuff
 func (s *State) StartUI(uiWG *sync.WaitGroup, quitChan chan struct{}) {
 	g, err := ui.NewGui(ui.OutputNormal)
-	g.Mouse = true
 	if err != nil {
 		panic(err)
 	}
@@ -47,7 +46,7 @@ func (s *State) StartUI(uiWG *sync.WaitGroup, quitChan chan struct{}) {
 	err = s.ui.SetKeybinding("", ui.KeyArrowDown, ui.ModNone, scrollDown)
 	if err != nil {
 		panic(err)
-	}
+	} /* Mouse stuff broke copying out of the terminal... not ideal
 	err = s.ui.SetKeybinding("", ui.MouseWheelUp, ui.ModNone, scrollUp)
 	if err != nil {
 		panic(err)
@@ -55,7 +54,7 @@ func (s *State) StartUI(uiWG *sync.WaitGroup, quitChan chan struct{}) {
 	err = s.ui.SetKeybinding("", ui.MouseWheelDown, ui.ModNone, scrollDown)
 	if err != nil {
 		panic(err)
-	}
+	}*/
 	uiWG.Done()
 	err = s.ui.MainLoop()
 	if err != nil && err != ui.ErrQuit {

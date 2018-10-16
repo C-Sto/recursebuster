@@ -43,7 +43,6 @@ func ManageNewURLs() {
 	//decides on whether to add to the directory list, or add to file output
 	for {
 		candidate := <-gState.Chans.newPagesChan
-
 		//check the candidate is an actual URL
 		u, err := url.Parse(strings.TrimSpace(candidate.URL))
 
@@ -185,8 +184,7 @@ func dirBust(page SpiderPage) {
 	}
 
 	atomic.StoreUint32(gState.DirbProgress, 0)
-
-	tested := make(map[string]bool)        //ensure we don't send things more than once
+	//ensure we don't send things more than once
 	for _, word := range gState.WordList { //will receive from the channel until it's closed
 		//read words off the channel, and test it OR close out because we wanna skip it
 		if word == "" {
@@ -204,31 +202,40 @@ func dirBust(page SpiderPage) {
 			for _, method := range gState.Methods {
 				if len(gState.Extensions) > 0 && gState.Extensions[0] != "" {
 					for _, ext := range gState.Extensions {
-						if tested[method+page.URL+word+"."+ext] {
+						gState.CMut.Lock()
+						if gState.Checked[method+page.URL+word+"."+ext] {
+							gState.CMut.Unlock()
 							continue
 						}
 						gState.Chans.workersChan <- struct{}{}
 						gState.wg.Add(1)
 						go testURL(method, page.URL+word+"."+ext, gState.Client)
-						tested[method+page.URL+word+"."+ext] = true
+						gState.Checked[method+page.URL+word+"."+ext] = true
+						gState.CMut.Unlock()
 					}
 				}
 				if gState.Cfg.AppendDir {
-					if tested[method+page.URL+word+"/"] {
+					gState.CMut.Lock()
+					if gState.Checked[method+page.URL+word+"/"] {
+						gState.CMut.Unlock()
 						continue
 					}
 					gState.Chans.workersChan <- struct{}{}
 					gState.wg.Add(1)
 					go testURL(method, page.URL+word+"/", gState.Client)
-					tested[method+page.URL+word+"/"] = true
+					gState.Checked[method+page.URL+word+"/"] = true
+					gState.CMut.Unlock()
 				}
-				if tested[method+page.URL+word] {
+				gState.CMut.Lock()
+				if gState.Checked[method+page.URL+word] {
+					gState.CMut.Unlock()
 					continue
 				}
 				gState.Chans.workersChan <- struct{}{}
 				gState.wg.Add(1)
 				go testURL(method, page.URL+word, gState.Client)
-				tested[method+page.URL+word] = true
+				gState.Checked[method+page.URL+word] = true
+				gState.CMut.Unlock()
 				//if gState.Cfg.MaxDirs == 1 {
 				atomic.AddUint32(gState.DirbProgress, 1)
 				//}
