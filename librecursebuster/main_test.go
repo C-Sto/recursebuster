@@ -156,7 +156,6 @@ func TestBadHeaders(t *testing.T) {
 	cfg := getDefaultConfig()
 	cfg.BadHeader = ArrayStringFlag{}
 	cfg.BadHeader.Set("X-Bad-Header: test123")
-	fmt.Println(cfg.BadHeader)
 	urlSlice := preSetupTest(cfg, "2005", finished)
 	gState.WordList = append(gState.WordList, "badheader")
 	found := postSetupTest(urlSlice)
@@ -166,6 +165,28 @@ func TestBadHeaders(t *testing.T) {
 		if strings.Contains(x, "badheader") {
 			panic("Failed bad header code test")
 		}
+	}
+
+}
+
+func TestAjax(t *testing.T) {
+	//ensure that basic auth checks are found
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.Ajax = true
+	urlSlice := preSetupTest(cfg, "2006", finished)
+	gState.WordList = append(gState.WordList, "ajaxonly")
+	gState.WordList = append(gState.WordList, "onlynoajax")
+	found := postSetupTest(urlSlice)
+	gState.Wait()
+
+	fmt.Println(found)
+	if x, ok := found["/ajaxonly"]; !ok || !x {
+		panic("Failed ajax header check")
+	}
+
+	if x, ok := found["/onlynoajax"]; ok || x {
+		panic("Failed ajax header check")
 	}
 
 }

@@ -109,6 +109,18 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		respCode = 500
 	case "/c/d":
 		respCode = 666
+	case "/ajaxonly":
+		if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+			respCode = 200
+		} else {
+			respCode = 404
+		}
+	case "/onlynoajax":
+		if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+			respCode = 404
+		} else {
+			respCode = 200
+		}
 	default:
 		respCode = 404
 	}

@@ -249,6 +249,7 @@ type HostState struct {
 //Config represents the configuration supplied at runtime. Different to program State which can change, this is set once, and only queried during program operation.
 type Config struct {
 	Agent             string
+	Ajax              bool
 	AppendDir         bool
 	Auth              string
 	BadResponses      string
@@ -320,6 +321,11 @@ type SpiderPage struct {
 //SetupState will perform all the basic state setup functions (adding URL's to the blacklist etc)
 func SetupState(globalState *State) {
 	SetState(globalState)
+
+	if gState.Cfg.Ajax {
+		gState.Cfg.Headers = append(gState.Cfg.Headers, "X-Requested-With:XMLHttpRequest")
+	}
+
 	for _, x := range strings.Split(gState.Cfg.Extensions, ",") {
 		gState.Extensions = append(gState.Extensions, x)
 	}
