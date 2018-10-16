@@ -202,34 +202,33 @@ func dirBust(page SpiderPage) {
 			return
 		default:
 			for _, method := range gState.Methods {
-
 				if len(gState.Extensions) > 0 && gState.Extensions[0] != "" {
 					for _, ext := range gState.Extensions {
-						if tested[page.URL+word+"."+ext] {
+						if tested[method+page.URL+word+"."+ext] {
 							continue
 						}
 						gState.Chans.workersChan <- struct{}{}
 						gState.wg.Add(1)
 						go testURL(method, page.URL+word+"."+ext, gState.Client)
-						tested[page.URL+word+"."+ext] = true
+						tested[method+page.URL+word+"."+ext] = true
 					}
 				}
 				if gState.Cfg.AppendDir {
-					if tested[page.URL+word+"/"] {
+					if tested[method+page.URL+word+"/"] {
 						continue
 					}
 					gState.Chans.workersChan <- struct{}{}
 					gState.wg.Add(1)
 					go testURL(method, page.URL+word+"/", gState.Client)
-					tested[page.URL+word+"/"] = true
+					tested[method+page.URL+word+"/"] = true
 				}
-				if tested[page.URL+word] {
+				if tested[method+page.URL+word] {
 					continue
 				}
 				gState.Chans.workersChan <- struct{}{}
 				gState.wg.Add(1)
 				go testURL(method, page.URL+word, gState.Client)
-				tested[page.URL+word] = true
+				tested[method+page.URL+word] = true
 				//if gState.Cfg.MaxDirs == 1 {
 				atomic.AddUint32(gState.DirbProgress, 1)
 				//}

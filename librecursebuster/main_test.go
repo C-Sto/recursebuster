@@ -174,14 +174,20 @@ func TestAjax(t *testing.T) {
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
 	cfg.Ajax = true
+	cfg.Methods = "GET,POST"
 	urlSlice := preSetupTest(cfg, "2006", finished)
 	gState.WordList = append(gState.WordList, "ajaxonly")
 	gState.WordList = append(gState.WordList, "onlynoajax")
+	gState.WordList = append(gState.WordList, "ajaxpost")
 	found := postSetupTest(urlSlice)
 	gState.Wait()
 
 	fmt.Println(found)
 	if x, ok := found["/ajaxonly"]; !ok || !x {
+		panic("Failed ajax header check")
+	}
+
+	if x, ok := found["/ajaxpost"]; !ok || !x {
 		panic("Failed ajax header check")
 	}
 

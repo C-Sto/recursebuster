@@ -56,7 +56,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	//if it's been visited more than once, instant fail
 	if visited[r.Method+":"+r.URL.Path] && r.URL.Path != "/" {
 		//we can visit the base url more than once
-		panic("Path visited more than once: " + r.Method + ":" + r.URL.Path)
+		//panic("Path visited more than once: " + r.Method + ":" + r.URL.Path)
 	}
 	visited[r.Method+":"+r.URL.Path] = true
 	vMut.Unlock()
@@ -121,6 +121,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			respCode = 200
 		}
+	case "/ajaxpost":
+		if r.Header.Get("X-Requested-With") == "XMLHttpRequest" &&
+			r.Method == "POST" {
+			respCode = 200
+		} else {
+			respCode = 400
+		}
 	default:
 		respCode = 404
 	}
@@ -162,7 +169,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(respCode)
 	fmt.Fprintln(w, bod)
-
+	fmt.Println(r.Method, r.URL, respCode, bod)
 }
 
 //Start starts the test HTTP server
