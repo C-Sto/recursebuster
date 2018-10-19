@@ -33,7 +33,7 @@ func main() {
 	globalState.Cfg.Version = version //**
 	totesTested := uint64(0)
 	globalState.TotalTested = &totesTested
-	flag.BoolVar(&globalState.Cfg.ShowAll, "all", false, "Show, and write the result of all checks")
+	flag.BoolVar(&globalState.Cfg.ShowAll, "all", false, "Show, and write the result of all checks") // todo: add test
 	flag.BoolVar(&globalState.Cfg.AppendDir, "appendslash", false, "Append a / to all directory bruteforce requests (like extension, but slash instead of .yourthing)")
 	flag.BoolVar(&globalState.Cfg.Ajax, "ajax", false, "Add the X-Requested-With: XMLHttpRequest header to all requests")
 	flag.StringVar(&globalState.Cfg.Auth, "auth", "", "Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.")
@@ -41,9 +41,9 @@ func main() {
 	flag.Var(&globalState.Cfg.BadHeader, "badheader", "Check for presence of this header. If an exact match is found, the response is considered bad.Supply as key:value. Can specify multiple - eg '-badheader Location:cats -badheader X-ATT-DeviceId:XXXXX'")
 	flag.StringVar(&globalState.Cfg.BodyContent, "body", "", "File containing content to send in the body of the request. Content-length header will be set accordingly")
 	flag.StringVar(&globalState.Cfg.BlacklistLocation, "blacklist", "", "Blacklist of prefixes to not check. Will not check on exact matches.")
-	flag.StringVar(&globalState.Cfg.Canary, "canary", "", "Custom value to use to check for wildcards")
-	flag.BoolVar(&globalState.Cfg.CleanOutput, "clean", false, "Output clean URLs to the output file for easy loading into other tools and whatnot.")
-	flag.StringVar(&globalState.Cfg.Cookies, "cookies", "", "Any cookies to include with requests. This is smashed into the cookies header, so copy straight from burp I guess.")
+	flag.StringVar(&globalState.Cfg.Canary, "canary", "", "Custom value to use to check for wildcards")                                               //todo: add test
+	flag.BoolVar(&globalState.Cfg.CleanOutput, "clean", false, "Output clean URLs to the output file for easy loading into other tools and whatnot.") //todo: add test
+	flag.StringVar(&globalState.Cfg.Cookies, "cookies", "", "Any cookies to include with requests. This is smashed into the cookies header, so copy straight from burp I guess? (-cookies 'cookie1=cookie1content; cookie2=1; cookie3=cookie3lol?!?;'.")
 	flag.BoolVar(&globalState.Cfg.Debug, "debug", false, "Enable debugging")
 	//flag.IntVar(&globalState.Cfg.MaxDirs, "dirs", 1, "Maximum directories to perform busting on concurrently forcing limit to 1 because it's complicated otherwise
 	flag.StringVar(&globalState.Cfg.Extensions, "ext", "", "Extensions to append to checks. Multiple extensions can be specified, comma separate them.")

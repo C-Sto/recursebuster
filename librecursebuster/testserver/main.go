@@ -133,6 +133,18 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			respCode = 404
 		}
+	case "/cookiesonly":
+		x, err := r.Cookie("lol")
+		if err == nil && x.Value != "ok" {
+			respCode = 404
+			break
+		}
+		x, err = r.Cookie("cookie2")
+		if err == nil && x.Value != "test" {
+			respCode = 404
+			break
+		}
+		respCode = 200
 	case "/postbody":
 		if r.Method == "POST" && r.Body != nil {
 			bod, err := ioutil.ReadAll(r.Body)

@@ -228,6 +228,20 @@ func TestBlacklist(t *testing.T) {
 	}
 }
 
+func TestCookies(t *testing.T) {
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.Cookies = "lol=ok; cookie2=test;"
+	urlSlice := preSetupTest(cfg, "2009", finished, t)
+	gState.WordList = append(gState.WordList, "cookiesonly")
+	found := postSetupTest(urlSlice)
+	gState.Wait()
+
+	if x, ok := found["/cookiesonly"]; !ok || !x {
+		panic("Failed Cookie test")
+	}
+}
+
 func postSetupTest(urlSlice []string) (found map[string]bool) {
 	//start up the management goroutines
 	go ManageRequests()
