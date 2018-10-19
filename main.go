@@ -44,9 +44,9 @@ func main() {
 	flag.StringVar(&globalState.Cfg.Canary, "canary", "", "Custom value to use to check for wildcards")                                               //todo: add test
 	flag.BoolVar(&globalState.Cfg.CleanOutput, "clean", false, "Output clean URLs to the output file for easy loading into other tools and whatnot.") //todo: add test
 	flag.StringVar(&globalState.Cfg.Cookies, "cookies", "", "Any cookies to include with requests. This is smashed into the cookies header, so copy straight from burp I guess? (-cookies 'cookie1=cookie1content; cookie2=1; cookie3=cookie3lol?!?;'.")
-	flag.BoolVar(&globalState.Cfg.Debug, "debug", false, "Enable debugging")
+	flag.BoolVar(&globalState.Cfg.Debug, "debug", false, "Enable debugging") //todo: add test
 	//flag.IntVar(&globalState.Cfg.MaxDirs, "dirs", 1, "Maximum directories to perform busting on concurrently forcing limit to 1 because it's complicated otherwise
-	flag.StringVar(&globalState.Cfg.Extensions, "ext", "", "Extensions to append to checks. Multiple extensions can be specified, comma separate them.")
+	flag.StringVar(&globalState.Cfg.Extensions, "ext", "", "Extensions to append to checks. Multiple extensions can be specified, comma separate them. (-ext 'csv,exe,aspx')")
 	flag.Var(&globalState.Cfg.Headers, "headers", "Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'")
 	flag.BoolVar(&globalState.Cfg.HTTPS, "https", false, "Use HTTPS instead of HTTP.")
 	flag.StringVar(&globalState.Cfg.InputList, "iL", "", "File to use as an input list of URL's to start from")

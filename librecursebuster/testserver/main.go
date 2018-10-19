@@ -72,6 +72,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		fallthrough
 	case "/a":
 		fallthrough
+	case "/a.exe":
+		fallthrough
+	case "/a.csv":
+		fallthrough
+	case "/a.aspx":
+		fallthrough
 	case "/a/":
 		fallthrough
 	case "/a/b":

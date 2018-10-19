@@ -241,6 +241,26 @@ func TestCookies(t *testing.T) {
 		panic("Failed Cookie test")
 	}
 }
+func TestExt(t *testing.T) {
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.Extensions = "csv,exe,aspx"
+	urlSlice := preSetupTest(cfg, "2010", finished, t)
+	found := postSetupTest(urlSlice)
+	gState.Wait()
+
+	if x, ok := found["/a.exe"]; !ok || !x {
+		panic("Failed Ext test1")
+	}
+
+	if x, ok := found["/a.aspx"]; !ok || !x {
+		panic("Failed Ext test2")
+	}
+
+	if x, ok := found["/a.csv"]; !ok || !x {
+		panic("Failed Ext test3")
+	}
+}
 
 func postSetupTest(urlSlice []string) (found map[string]bool) {
 	//start up the management goroutines
