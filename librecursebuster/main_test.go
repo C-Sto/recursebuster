@@ -133,7 +133,6 @@ func TestBasicAuth(t *testing.T) {
 }
 
 func TestBadCodes(t *testing.T) {
-	//ensure that basic auth checks are found
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
 	cfg.BadResponses = "404,500"
@@ -151,7 +150,6 @@ func TestBadCodes(t *testing.T) {
 }
 
 func TestBadHeaders(t *testing.T) {
-	//ensure that basic auth checks are found
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
 	cfg.BadHeader = ArrayStringFlag{}
@@ -170,7 +168,6 @@ func TestBadHeaders(t *testing.T) {
 }
 
 func TestAjax(t *testing.T) {
-	//ensure that basic auth checks are found
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
 	cfg.Ajax = true
@@ -182,7 +179,6 @@ func TestAjax(t *testing.T) {
 	found := postSetupTest(urlSlice)
 	gState.Wait()
 
-	fmt.Println(found)
 	if x, ok := found["/ajaxonly"]; !ok || !x {
 		panic("Failed ajax header check")
 	}
@@ -195,6 +191,22 @@ func TestAjax(t *testing.T) {
 		panic("Failed ajax header check")
 	}
 
+}
+
+func TestBodyContent(t *testing.T) {
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.Methods = "GET,POST"
+	urlSlice := preSetupTest(cfg, "2006", finished, t)
+	gState.WordList = append(gState.WordList, "postbody")
+	gState.bodyContent = "test=bodycontent"
+	gState.Cfg.BodyContent = "test"
+	found := postSetupTest(urlSlice)
+	gState.Wait()
+
+	if x, ok := found["/postbody"]; !ok || !x {
+		panic("Failed body based request")
+	}
 }
 
 func postSetupTest(urlSlice []string) (found map[string]bool) {

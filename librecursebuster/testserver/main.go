@@ -1,7 +1,9 @@
 package testserver
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
@@ -129,8 +131,23 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			r.Method == "POST" {
 			respCode = 200
 		} else {
-			respCode = 400
+			respCode = 404
 		}
+	case "/postbody":
+		if r.Method == "POST" && r.Body != nil {
+			bod, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				panic(err)
+			}
+			if bytes.Compare(bod, []byte("test=bodycontent")) == 0 {
+				respCode = 200
+			} else {
+				respCode = 404
+			}
+		} else {
+			respCode = 404
+		}
+
 	default:
 		respCode = 404
 	}

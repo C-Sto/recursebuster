@@ -156,6 +156,8 @@ type State struct {
 	StartWG *sync.WaitGroup
 	wg      *sync.WaitGroup
 
+	bodyContent string
+
 	ui *gocui.Gui
 	//per host States
 	Hosts HostStates
@@ -355,6 +357,16 @@ func SetupState(globalState *State) {
 		for x := range readerChan {
 			gState.Blacklist[x] = true
 		}
+	}
+
+	if gState.Cfg.BodyContent != "" {
+		readerChan := make(chan string, 100)
+		go LoadWords(gState.Cfg.BodyContent, readerChan)
+		lines := []string{}
+		for x := range readerChan {
+			lines = append(lines, x)
+		}
+		gState.bodyContent = strings.Join(lines, "\n")
 	}
 
 	if gState.Cfg.WhitelistLocation != "" {

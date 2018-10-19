@@ -64,8 +64,12 @@ func ConfigureHTTPClient(sendToBurpOnly bool) *http.Client {
 //HTTPReq sends the HTTP request based on the given settings, returns the response and the body
 //todo: This can probably be optimized to exit once the head has been retreived and discard the body
 func HTTPReq(method, path string, client *http.Client) (resp *http.Response, err error) {
-	req, err := http.NewRequest(method, path, nil)
-
+	var req *http.Request
+	if gState.Cfg.BodyContent != "" {
+		req, err = http.NewRequest(method, path, strings.NewReader(gState.bodyContent))
+	} else {
+		req, err = http.NewRequest(method, path, nil)
+	}
 	if err != nil {
 		return nil, err
 	}

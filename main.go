@@ -14,7 +14,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.5.11"
+const version = "1.5.12"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -39,7 +39,7 @@ func main() {
 	flag.StringVar(&globalState.Cfg.Auth, "auth", "", "Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.")
 	flag.StringVar(&globalState.Cfg.BadResponses, "bad", "404", "Responses to consider 'bad' or 'not found'. Comma-separated. This works the opposite way of gobuster!")
 	flag.Var(&globalState.Cfg.BadHeader, "badheader", "Check for presence of this header. If an exact match is found, the response is considered bad.Supply as key:value. Can specify multiple - eg '-badheader Location:cats -badheader X-ATT-DeviceId:XXXXX'")
-	//flag.StringVar(&globalState.Cfg.BodyContent, "body", "", "File containing content to send in the body of the request.") all empty body for now
+	flag.StringVar(&globalState.Cfg.BodyContent, "body", "", "File containing content to send in the body of the request. Content-length header will be set accordingly")
 	flag.StringVar(&globalState.Cfg.BlacklistLocation, "blacklist", "", "Blacklist of prefixes to not check. Will not check on exact matches.")
 	flag.StringVar(&globalState.Cfg.Canary, "canary", "", "Custom value to use to check for wildcards")
 	flag.BoolVar(&globalState.Cfg.CleanOutput, "clean", false, "Output clean URLs to the output file for easy loading into other tools and whatnot.")
