@@ -197,7 +197,7 @@ func TestBodyContent(t *testing.T) {
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
 	cfg.Methods = "GET,POST"
-	urlSlice := preSetupTest(cfg, "2006", finished, t)
+	urlSlice := preSetupTest(cfg, "2007", finished, t)
 	gState.WordList = append(gState.WordList, "postbody")
 	gState.bodyContent = "test=bodycontent"
 	gState.Cfg.BodyContent = "test"
@@ -206,6 +206,25 @@ func TestBodyContent(t *testing.T) {
 
 	if x, ok := found["/postbody"]; !ok || !x {
 		panic("Failed body based request")
+	}
+}
+
+func TestBlacklist(t *testing.T) {
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	urlSlice := preSetupTest(cfg, "2008", finished, t)
+	gState.Cfg.BlacklistLocation = "test"
+	gState.Blacklist = make(map[string]bool)
+	gState.Blacklist["http://localhost:2008/a/b"] = true
+	found := postSetupTest(urlSlice)
+	gState.Wait()
+
+	if x, ok := found["/a/b"]; ok || x {
+		panic("Failed blacklist testing1")
+	}
+
+	if x, ok := found["/a/b/c"]; ok || x {
+		panic("Failed blacklist testing2")
 	}
 }
 

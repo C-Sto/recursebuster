@@ -3,6 +3,7 @@ package librecursebuster
 import (
 	"bytes"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -64,6 +65,11 @@ func ConfigureHTTPClient(sendToBurpOnly bool) *http.Client {
 //HTTPReq sends the HTTP request based on the given settings, returns the response and the body
 //todo: This can probably be optimized to exit once the head has been retreived and discard the body
 func HTTPReq(method, path string, client *http.Client) (resp *http.Response, err error) {
+
+	if gState.Blacklist[path] {
+		return nil, errors.New("Blacklisted URL: " + path)
+	}
+
 	var req *http.Request
 	if gState.Cfg.BodyContent != "" {
 		req, err = http.NewRequest(method, path, strings.NewReader(gState.bodyContent))

@@ -333,7 +333,6 @@ func SetupState(globalState *State) {
 	}
 
 	for _, x := range strings.Split(gState.Cfg.Methods, ",") {
-		fmt.Println(x)
 		gState.Methods = append(gState.Methods, x)
 	}
 
