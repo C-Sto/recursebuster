@@ -14,7 +14,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.5.12"
+const version = "1.5.13"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
