@@ -14,7 +14,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.5.13"
+const version = "1.5.14"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -39,7 +39,7 @@ func main() {
 	flag.StringVar(&globalState.Cfg.Auth, "auth", "", "Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.")
 	flag.StringVar(&globalState.Cfg.BadResponses, "bad", "404", "Responses to consider 'bad' or 'not found'. Comma-separated. This works the opposite way of gobuster!")
 	flag.Var(&globalState.Cfg.BadHeader, "badheader", "Check for presence of this header. If an exact match is found, the response is considered bad.Supply as key:value. Can specify multiple - eg '-badheader Location:cats -badheader X-ATT-DeviceId:XXXXX'")
-	flag.StringVar(&globalState.Cfg.BodyContent, "body", "", "File containing content to send in the body of the request. Content-length header will be set accordingly")
+	flag.StringVar(&globalState.Cfg.BodyContent, "body", "", "File containing content to send in the body of the request. Content-length header will be set accordingly. Note: HEAD requests will/should fail (server will reply with a 400). Set the '-nohead' option to prevent HEAD being sent before a GET.")
 	flag.StringVar(&globalState.Cfg.BlacklistLocation, "blacklist", "", "Blacklist of prefixes to not check. Will not check on exact matches.")
 	flag.StringVar(&globalState.Cfg.Canary, "canary", "", "Custom value to use to check for wildcards")                                               //todo: add test
 	flag.BoolVar(&globalState.Cfg.CleanOutput, "clean", false, "Output clean URLs to the output file for easy loading into other tools and whatnot.") //todo: add test
@@ -79,7 +79,7 @@ func main() {
 	flag.Parse()
 
 	if globalState.Cfg.ShowVersion {
-		librecursebuster.PrintBanner()
+		globalState.PrintBanner()
 		os.Exit(0)
 	}
 
@@ -92,7 +92,7 @@ func main() {
 
 	setupConfig(globalState, urlSlice[0])
 
-	librecursebuster.SetupState(globalState)
+	globalState.SetupState()
 
 	//do first load of urls (send canary requests to make sure we can dirbust them)
 	quitChan := make(chan struct{})
@@ -105,17 +105,17 @@ func main() {
 	}
 
 	if globalState.Cfg.NoUI {
-		librecursebuster.PrintBanner()
-		go librecursebuster.StatusPrinter()
+		globalState.PrintBanner()
+		go globalState.StatusPrinter()
 	} else {
-		go librecursebuster.UIPrinter()
+		go globalState.UIPrinter()
 	}
-	go librecursebuster.ManageRequests()
-	go librecursebuster.ManageNewURLs()
-	go librecursebuster.OutputWriter(globalState.Cfg.Localpath)
-	go librecursebuster.StatsTracker()
+	go globalState.ManageRequests()
+	go globalState.ManageNewURLs()
+	go globalState.OutputWriter(globalState.Cfg.Localpath)
+	go globalState.StatsTracker()
 
-	librecursebuster.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0)
+	globalState.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0)
 
 	//seed the workers
 	for _, s := range urlSlice {
@@ -145,7 +145,7 @@ func main() {
 		randURL := fmt.Sprintf("%s%s", prefix, globalState.Cfg.Canary)
 		globalState.Chans.GetWorkers() <- struct{}{}
 		globalState.AddWG()
-		go librecursebuster.StartBusting(randURL, *u)
+		go globalState.StartBusting(randURL, *u)
 
 	}
 

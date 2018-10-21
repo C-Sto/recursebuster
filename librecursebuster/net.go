@@ -16,7 +16,7 @@ import (
 )
 
 //ConfigureHTTPClient configures and returns a HTTP Client (mostly useful to be able to send to burp)
-func ConfigureHTTPClient(sendToBurpOnly bool) *http.Client {
+func (gState *State) ConfigureHTTPClient(sendToBurpOnly bool) *http.Client {
 
 	httpTransport := &http.Transport{MaxIdleConns: 100}
 	client := &http.Client{Transport: httpTransport, Timeout: time.Duration(gState.Cfg.Timeout) * time.Second}
@@ -55,7 +55,7 @@ func ConfigureHTTPClient(sendToBurpOnly bool) *http.Client {
 		}
 		if !sendToBurpOnly {
 			//send the set proxy status (don't need this for burp requests)
-			PrintOutput(fmt.Sprintf("Proxy set to: %s", gState.Cfg.ProxyAddr), Info, 0)
+			gState.PrintOutput(fmt.Sprintf("Proxy set to: %s", gState.Cfg.ProxyAddr), Info, 0)
 		}
 	}
 
@@ -64,7 +64,7 @@ func ConfigureHTTPClient(sendToBurpOnly bool) *http.Client {
 
 //HTTPReq sends the HTTP request based on the given settings, returns the response and the body
 //todo: This can probably be optimized to exit once the head has been retreived and discard the body
-func HTTPReq(method, path string, client *http.Client) (resp *http.Response, err error) {
+func (gState *State) HTTPReq(method, path string, client *http.Client) (resp *http.Response, err error) {
 
 	if gState.Blacklist[path] {
 		return nil, errors.New("Blacklisted URL: " + path)
@@ -95,7 +95,6 @@ func HTTPReq(method, path string, client *http.Client) (resp *http.Response, err
 			req.Header.Set(spl[0], spl[1])
 		}
 	}
-
 	resp, err = client.Do(req)
 	if err != nil {
 		return nil, err
@@ -111,17 +110,17 @@ func HTTPReq(method, path string, client *http.Client) (resp *http.Response, err
 	return resp, err
 }
 
-func evaluateURL(method string, urlString string, client *http.Client) (headResp *http.Response, content []byte, success bool) {
+func (gState *State) evaluateURL(method string, urlString string, client *http.Client) (headResp *http.Response, content []byte, success bool) {
 	success = true
 	//wg.Add(1)
 	//PrintOutput("EVALUATING:"+method+":"+urlString, Debug, 4, wg, printChan)
 	//optimize GET requests by sending a head first (it's cheaper)
 	if method == "GET" && !gState.Cfg.NoHead {
-		headResp, err := HTTPReq("HEAD", urlString, client) //send a HEAD. Ignore body response
+		headResp, err := gState.HTTPReq("HEAD", urlString, client) //send a HEAD. Ignore body response
 		if err != nil {
 			success = false
 			<-gState.Chans.workersChan //done with the net thread
-			PrintOutput(fmt.Sprintf("%s", err), Error, 0)
+			gState.PrintOutput(fmt.Sprintf("%s", err), Error, 0)
 			return headResp, content, success
 		}
 
@@ -135,19 +134,19 @@ func evaluateURL(method string, urlString string, client *http.Client) (headResp
 		//this is all we have to do if we aren't doing GET's
 		if gState.Cfg.NoGet {
 			if gState.Cfg.BurpMode { //send successful request again... twice as many requests, but less burp spam
-				HTTPReq("HEAD", urlString, gState.BurpClient) //send a HEAD. Ignore body response
+				gState.HTTPReq("HEAD", urlString, gState.BurpClient) //send a HEAD. Ignore body response
 			}
 			<-gState.Chans.workersChan
 			return headResp, content, success
 		}
 	}
 
-	headResp, err := HTTPReq(method, urlString, client)
+	headResp, err := gState.HTTPReq(method, urlString, client)
 	content, _ = ioutil.ReadAll(headResp.Body)
 	<-gState.Chans.workersChan //done with the net thread
 	if err != nil {
 		success = false
-		PrintOutput(fmt.Sprintf("%s", err), Error, 0)
+		gState.PrintOutput(fmt.Sprintf("%s", err), Error, 0)
 
 		return headResp, content, success
 	}
@@ -176,12 +175,12 @@ func evaluateURL(method string, urlString string, client *http.Client) (headResp
 
 	//get content from validated path/file thing
 	if gState.Cfg.BurpMode {
-		HTTPReq(method, urlString, gState.BurpClient)
+		gState.HTTPReq(method, urlString, gState.BurpClient)
 	}
 
 	//check we care about it (body only) section
 	//double check that it's not 404/error using smart blockchain AI tech
-	PrintOutput(
+	gState.PrintOutput(
 		fmt.Sprintf("Checking body for 404:\nContent: %v,\nSoft404:%v,\nResponse:%v",
 			string(content), string(gState.Hosts.Get404Body(headResp.Request.Host)),
 			detectSoft404(headResp, gState.Hosts.Get404(headResp.Request.Host), gState.Cfg.Ratio404)),

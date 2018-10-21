@@ -82,12 +82,12 @@ type OutLine struct {
 	Type    *ConsoleWriter
 }
 
-var gState *State
+//var gState *State
 
 //SetState will assign the global state object
-func SetState(s *State) {
-	gState = s
-}
+//func (gState *State) SetState(s *State) {
+//gState = s
+//}
 
 //Wait will wait until all the relevant waitgroups have completed
 func (s *State) Wait() {
@@ -98,6 +98,13 @@ func (s *State) Wait() {
 		s.ui.Update(func(*gocui.Gui) error { return gocui.ErrQuit })
 		s.wg.Wait()
 	}
+	//close all the chans to avoid leaking routines during tests
+	//	close(gState.Chans.confirmedChan)
+	//	close(gState.Chans.newPagesChan)
+	//	close(gState.Chans.pagesChan)
+	//	close(gState.Chans.printChan)
+	//	close(gState.Chans.testChan)
+	//	close(gState.Chans.workersChan)
 	//StopUI()
 }
 
@@ -120,7 +127,7 @@ func (chans) Init() *chans {
 		pagesChan:     make(chan SpiderPage, 1000),
 		newPagesChan:  make(chan SpiderPage, 10000),
 		confirmedChan: make(chan SpiderPage, 1000),
-		workersChan:   make(chan struct{}, 1),
+		//workersChan:   make(chan struct{}, workerCount),
 		//maxDirs := make(chan struct{}, cfg.MaxDirs),
 		testChan:  make(chan string, 100),
 		printChan: make(chan OutLine, 100),
@@ -321,8 +328,10 @@ type SpiderPage struct {
 }
 
 //SetupState will perform all the basic state setup functions (adding URL's to the blacklist etc)
-func SetupState(globalState *State) {
-	SetState(globalState)
+func (gState *State) SetupState() {
+
+	//set workers (whoops)
+	gState.Chans.workersChan = make(chan struct{}, gState.Cfg.Threads)
 
 	if gState.Cfg.Ajax {
 		gState.Cfg.Headers = append(gState.Cfg.Headers, "X-Requested-With:XMLHttpRequest")
@@ -345,8 +354,8 @@ func SetupState(globalState *State) {
 		gState.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
 	}
 
-	gState.Client = ConfigureHTTPClient(false)
-	gState.BurpClient = ConfigureHTTPClient(true)
+	gState.Client = gState.ConfigureHTTPClient(false)
+	gState.BurpClient = gState.ConfigureHTTPClient(true)
 
 	gState.Version = gState.Cfg.Version
 

@@ -12,7 +12,7 @@ import (
 )
 
 //PrintBanner prints the banner and in debug mode will also print all set options
-func PrintBanner() {
+func (gState *State) PrintBanner() {
 	//todo: include settings in banner
 	if gState.Cfg.NoUI || gState.Cfg.ShowVersion {
 		fmt.Println(strings.Repeat("=", 20))
@@ -21,14 +21,14 @@ func PrintBanner() {
 		fmt.Println("Heavy influence from Gograbber, thx Swarlz")
 		fmt.Println(strings.Repeat("=", 20))
 		if gState.Cfg.Debug {
-			printOpts()
+			gState.printOpts()
 			fmt.Println(strings.Repeat("=", 20))
 		}
 	}
 }
 
 //stolen from swarlz
-func printOpts() {
+func (gState *State) printOpts() {
 	keys := reflect.ValueOf(gState.Cfg).Elem()
 	typeOfT := keys.Type()
 	for i := 0; i < keys.NumField(); i++ {
@@ -39,7 +39,7 @@ func printOpts() {
 }
 
 //OutputWriter will write to a file and the screen
-func OutputWriter(localPath string) {
+func (gState *State) OutputWriter(localPath string) {
 	//output worker
 	pages := make(map[string]bool) //keep it unique
 	file, err := os.OpenFile(localPath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0644)
@@ -79,30 +79,30 @@ func OutputWriter(localPath string) {
 			file.WriteString(writeS + "\n")
 			file.Sync()
 
-			printBasedOnStatus(object.Result.StatusCode, printS)
+			gState.printBasedOnStatus(object.Result.StatusCode, printS)
 		}
 		gState.wg.Done()
 		//wg.Done()
 	}
 }
 
-func printBasedOnStatus(status int, printS string) {
+func (gState *State) printBasedOnStatus(status int, printS string) {
 	x := status
 	if 199 < x && x < 300 { //2xx
-		PrintOutput(printS, Good2, 0)
+		gState.PrintOutput(printS, Good2, 0)
 	} else if 299 < x && x < 400 { //3xx
-		PrintOutput(printS, Good3, 0)
+		gState.PrintOutput(printS, Good3, 0)
 	} else if 399 < x && x < 500 { //4xx
-		PrintOutput(printS, Good4, 0)
+		gState.PrintOutput(printS, Good4, 0)
 	} else if 499 < x && x < 600 { //5xx
-		PrintOutput(printS, Good5, 0)
+		gState.PrintOutput(printS, Good5, 0)
 	} else {
-		PrintOutput(printS, Goodx, 0)
+		gState.PrintOutput(printS, Goodx, 0)
 	}
 }
 
 //PrintOutput used to send output to the screen
-func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int) {
+func (gState *State) PrintOutput(message string, writer *ConsoleWriter, verboseLevel int) {
 	gState.wg.Add(1)
 	gState.Chans.printChan <- OutLine{
 		Content: message,
@@ -112,7 +112,7 @@ func PrintOutput(message string, writer *ConsoleWriter, verboseLevel int) {
 }
 
 //UIPrinter is called to write a pretty UI
-func UIPrinter() {
+func (gState *State) UIPrinter() {
 	tick := time.NewTicker(time.Second / 30) //30 'fps'
 	testedURL := ""
 	for {
@@ -121,16 +121,16 @@ func UIPrinter() {
 			//something to print
 			//v.Write([]byte(o.Content + "\n"))
 			if gState.Cfg.VerboseLevel >= o.Level {
-				addToMainUI(o)
+				gState.addToMainUI(o)
 			}
 			gState.wg.Done()
 			//gState.ui.Update()
 			//fmt.Fprintln(v, o.Content+"\n")
 
 		case <-tick.C:
-			writeStatus(testedURL)
+			gState.writeStatus(testedURL)
 			//refreshUI() //time has elapsed the amount of time - it's been 2 seconds
-			updateUI()
+			gState.updateUI()
 
 		case t := <-gState.Chans.testChan:
 			//URL has been assessed
@@ -140,12 +140,12 @@ func UIPrinter() {
 	}
 }
 
-func updateUI() {
+func (gState *State) updateUI() {
 	gState.ui.Update(func(g *gocui.Gui) error { return nil })
 
 }
 
-func addToMainUI(o OutLine) { //s string) {
+func (gState *State) addToMainUI(o OutLine) { //s string) {
 	//go gState.ui.Update(func(g *gocui.Gui) error {
 	//g := gState.ui
 	v, err := gState.ui.View("Main")
@@ -157,7 +157,7 @@ func addToMainUI(o OutLine) { //s string) {
 	//})
 }
 
-func writeStatus(s string) {
+func (gState *State) writeStatus(s string) {
 	//go gState.ui.Update(func(g *gocui.Gui) error {
 	//g := gState.ui
 	v, err := gState.ui.View("Status")
@@ -166,7 +166,7 @@ func writeStatus(s string) {
 		// handle error
 	}
 	v.Clear()
-	fmt.Fprintln(v, getStatus())
+	fmt.Fprintln(v, gState.getStatus())
 	sprint := ""
 	if len(gState.WordList) > 0 {
 		sprint = fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(len(gState.WordList)), s)
@@ -181,9 +181,9 @@ func writeStatus(s string) {
 }
 
 //StatusPrinter is the function that performs all the status printing logic
-func StatusPrinter() {
+func (gState *State) StatusPrinter() {
 	tick := time.NewTicker(time.Second * 2)
-	status := getStatus()
+	status := gState.getStatus()
 	spacesToClear := 0
 	testedURL := ""
 	for {
@@ -210,10 +210,10 @@ func StatusPrinter() {
 			gState.wg.Done()
 
 		case <-tick.C: //time has elapsed the amount of time - it's been 2 seconds
-			status = getStatus()
+			status = gState.getStatus()
 
 		case t := <-gState.Chans.testChan: //a URL has been assessed
-			status = getStatus()
+			status = gState.getStatus()
 			testedURL = t
 		}
 
@@ -245,7 +245,7 @@ func StatusPrinter() {
 	}
 }
 
-func getStatus() string {
+func (gState *State) getStatus() string {
 	return fmt.Sprintf("Tested: %d Speed(2s): %d/s Speed: %d/s",
 		atomic.LoadUint64(gState.TotalTested),
 		atomic.LoadUint64(gState.PerSecondShort),
@@ -254,7 +254,7 @@ func getStatus() string {
 }
 
 //StatsTracker updates the stats every so often
-func StatsTracker() {
+func (gState *State) StatsTracker() {
 	tick := time.NewTicker(time.Second * 2)
 	testedBefore := atomic.LoadUint64(gState.TotalTested)
 	timeBefore := time.Now()

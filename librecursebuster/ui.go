@@ -16,17 +16,17 @@ func (s *State) StartUI(uiWG *sync.WaitGroup, quitChan chan struct{}) {
 	}
 	s.ui = g
 	defer func() {
-		StopUI()
+		s.StopUI()
 		close(quitChan)
 	}()
-	s.ui.SetManagerFunc(layout)
+	s.ui.SetManagerFunc(s.layout)
 
-	err = s.ui.SetKeybinding("", ui.KeyCtrlX, ui.ModNone, handleX)
+	err = s.ui.SetKeybinding("", ui.KeyCtrlX, ui.ModNone, s.handleX)
 	if err != nil {
 		panic(err)
 	}
 
-	err = s.ui.SetKeybinding("", ui.KeyCtrlC, ui.ModNone, quit)
+	err = s.ui.SetKeybinding("", ui.KeyCtrlC, ui.ModNone, s.quit)
 	if err != nil {
 		panic(err)
 	}
@@ -63,14 +63,14 @@ func (s *State) StartUI(uiWG *sync.WaitGroup, quitChan chan struct{}) {
 }
 
 //StopUI should be called when closing the program. It prints out the lines in the main view buffer to stdout, and closes the ui object
-func StopUI() {
+func (gState *State) StopUI() {
 	p, _ := gState.ui.View("Main")
 	lines := p.ViewBuffer()
 	gState.ui.Close()
 	fmt.Print(lines)
 }
 
-func handleX(g *ui.Gui, v *ui.View) error {
+func (gState *State) handleX(g *ui.Gui, v *ui.View) error {
 	//vi, _ := g.View("Main")
 	//close(gState.StopDir)
 	select { //lol dope hack to stop it blocking
@@ -82,11 +82,11 @@ func handleX(g *ui.Gui, v *ui.View) error {
 	return nil
 }
 
-func quit(g *ui.Gui, v *ui.View) error {
+func (gState *State) quit(g *ui.Gui, v *ui.View) error {
 	return ui.ErrQuit
 }
 
-func layout(g *ui.Gui) error {
+func (gState *State) layout(g *ui.Gui) error {
 	mX, mY := g.Size()
 	v, err := g.SetView("Main", 0, 0, mX-1, mY-7)
 	if err != nil && err != ui.ErrUnknownView {

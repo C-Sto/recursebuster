@@ -43,11 +43,11 @@ const localURL = "http://localhost:"
 */
 
 func TestBasicFunctionality(t *testing.T) {
-
+	t.Parallel()
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
-	urlSlice := preSetupTest(cfg, "2001", finished, t)
-	found := postSetupTest(urlSlice)
+	gState, urlSlice := preSetupTest(cfg, "2001", finished, t)
+	found := postSetupTest(urlSlice, gState)
 
 	//waitgroup check (if test times out, the waitgroup is broken... somewhere)
 	gState.Wait()
@@ -102,12 +102,13 @@ func TestBasicFunctionality(t *testing.T) {
 
 func TestAppendSlash(t *testing.T) {
 	//add an appendslash value to the wordlist that should _only_ be found if the appendslash var is set
+	t.Parallel()
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
-	urlSlice := preSetupTest(cfg, "2002", finished, t)
+	gState, urlSlice := preSetupTest(cfg, "2002", finished, t)
 	gState.Cfg.AppendDir = true
 	gState.WordList = append(gState.WordList, "appendslash")
-	found := postSetupTest(urlSlice)
+	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
 	if x, ok := found["/appendslash/"]; !ok || !x {
@@ -117,13 +118,14 @@ func TestAppendSlash(t *testing.T) {
 }
 
 func TestBasicAuth(t *testing.T) {
+	t.Parallel()
 	//ensure that basic auth checks are found
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
 	cfg.Auth = "dGVzdDp0ZXN0"
-	urlSlice := preSetupTest(cfg, "2003", finished, t)
+	gState, urlSlice := preSetupTest(cfg, "2003", finished, t)
 	gState.WordList = append(gState.WordList, "basicauth")
-	found := postSetupTest(urlSlice)
+	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
 	if x, ok := found["/a/b/c/basicauth"]; !ok || !x {
@@ -133,12 +135,13 @@ func TestBasicAuth(t *testing.T) {
 }
 
 func TestBadCodes(t *testing.T) {
+	t.Parallel()
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
 	cfg.BadResponses = "404,500"
-	urlSlice := preSetupTest(cfg, "2004", finished, t)
+	gState, urlSlice := preSetupTest(cfg, "2004", finished, t)
 	gState.WordList = append(gState.WordList, "badcode")
-	found := postSetupTest(urlSlice)
+	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
 	for x := range found {
@@ -150,13 +153,14 @@ func TestBadCodes(t *testing.T) {
 }
 
 func TestBadHeaders(t *testing.T) {
+	t.Parallel()
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
 	cfg.BadHeader = ArrayStringFlag{}
 	cfg.BadHeader.Set("X-Bad-Header: test123")
-	urlSlice := preSetupTest(cfg, "2005", finished, t)
+	gState, urlSlice := preSetupTest(cfg, "2005", finished, t)
 	gState.WordList = append(gState.WordList, "badheader")
-	found := postSetupTest(urlSlice)
+	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
 	for x := range found {
@@ -168,15 +172,16 @@ func TestBadHeaders(t *testing.T) {
 }
 
 func TestAjax(t *testing.T) {
+	t.Parallel()
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
 	cfg.Ajax = true
 	cfg.Methods = "GET,POST"
-	urlSlice := preSetupTest(cfg, "2006", finished, t)
+	gState, urlSlice := preSetupTest(cfg, "2006", finished, t)
 	gState.WordList = append(gState.WordList, "ajaxonly")
 	gState.WordList = append(gState.WordList, "onlynoajax")
 	gState.WordList = append(gState.WordList, "ajaxpost")
-	found := postSetupTest(urlSlice)
+	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
 	if x, ok := found["/ajaxonly"]; !ok || !x {
@@ -194,14 +199,16 @@ func TestAjax(t *testing.T) {
 }
 
 func TestBodyContent(t *testing.T) {
+	t.Parallel()
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
 	cfg.Methods = "GET,POST"
-	urlSlice := preSetupTest(cfg, "2007", finished, t)
+	cfg.NoHead = true
+	gState, urlSlice := preSetupTest(cfg, "2007", finished, t)
 	gState.WordList = append(gState.WordList, "postbody")
 	gState.bodyContent = "test=bodycontent"
 	gState.Cfg.BodyContent = "test"
-	found := postSetupTest(urlSlice)
+	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
 	if x, ok := found["/postbody"]; !ok || !x {
@@ -210,13 +217,14 @@ func TestBodyContent(t *testing.T) {
 }
 
 func TestBlacklist(t *testing.T) {
+	t.Parallel()
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
-	urlSlice := preSetupTest(cfg, "2008", finished, t)
+	gState, urlSlice := preSetupTest(cfg, "2008", finished, t)
 	gState.Cfg.BlacklistLocation = "test"
 	gState.Blacklist = make(map[string]bool)
 	gState.Blacklist["http://localhost:2008/a/b"] = true
-	found := postSetupTest(urlSlice)
+	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
 	if x, ok := found["/a/b"]; ok || x {
@@ -229,12 +237,13 @@ func TestBlacklist(t *testing.T) {
 }
 
 func TestCookies(t *testing.T) {
+	t.Parallel()
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
 	cfg.Cookies = "lol=ok; cookie2=test;"
-	urlSlice := preSetupTest(cfg, "2009", finished, t)
+	gState, urlSlice := preSetupTest(cfg, "2009", finished, t)
 	gState.WordList = append(gState.WordList, "cookiesonly")
-	found := postSetupTest(urlSlice)
+	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
 	if x, ok := found["/cookiesonly"]; !ok || !x {
@@ -242,11 +251,12 @@ func TestCookies(t *testing.T) {
 	}
 }
 func TestExt(t *testing.T) {
+	t.Parallel()
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
 	cfg.Extensions = "csv,exe,aspx"
-	urlSlice := preSetupTest(cfg, "2010", finished, t)
-	found := postSetupTest(urlSlice)
+	gState, urlSlice := preSetupTest(cfg, "2010", finished, t)
+	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
 	if x, ok := found["/a.exe"]; !ok || !x {
@@ -262,10 +272,10 @@ func TestExt(t *testing.T) {
 	}
 }
 
-func postSetupTest(urlSlice []string) (found map[string]bool) {
+func postSetupTest(urlSlice []string, gState *State) (found map[string]bool) {
 	//start up the management goroutines
-	go ManageRequests()
-	go ManageNewURLs()
+	go gState.ManageRequests()
+	go gState.ManageNewURLs()
 
 	//default turn url into a url object call
 	u, err := url.Parse(urlSlice[0])
@@ -281,7 +291,7 @@ func postSetupTest(urlSlice []string) (found map[string]bool) {
 	randURL := fmt.Sprintf("%s%s", prefix, gState.Cfg.Canary)
 	gState.AddWG()
 	gState.Chans.GetWorkers() <- struct{}{}
-	go StartBusting(randURL, *u)
+	go gState.StartBusting(randURL, *u)
 
 	//start the print channel (so that we can see output if a test fails)
 	go func() {
@@ -302,22 +312,24 @@ func postSetupTest(urlSlice []string) (found map[string]bool) {
 		for {
 			select {
 			case x := <-gState.Chans.confirmedChan:
-				gState.wg.Done()
+
 				u, e := url.Parse(x.URL)
 				if e != nil {
+					gState.wg.Done()
 					panic(e)
 				}
 				found[u.Path] = true
+				gState.wg.Done()
 				//fmt.Println("CONFIRMED!", x)
 			case <-t:
-				//fmt.Println(globalState.wg)
+				//fmt.Println(gState.wg)
 			}
 		}
 	}()
 	return
 }
 
-func preSetupTest(cfg *Config, servPort string, finished chan struct{}, t *testing.T) (urlSlice []string) {
+func preSetupTest(cfg *Config, servPort string, finished chan struct{}, t *testing.T) (stateObject *State, urlSlice []string) {
 	//Test default functions. Basic dirb should work, and all files should be found as expected
 
 	//basic state setup
@@ -329,7 +341,7 @@ func preSetupTest(cfg *Config, servPort string, finished chan struct{}, t *testi
 
 	//start the test server
 	setup := make(chan struct{})
-	go testserver.Start(servPort, finished, setup, t)
+	go testserver.TestServer{}.Start(servPort, finished, setup, t)
 	<-setup //whoa, concurrency sucks???
 	//test URL
 	globalState.Cfg.URL = localURL + servPort
@@ -341,7 +353,7 @@ func preSetupTest(cfg *Config, servPort string, finished chan struct{}, t *testi
 	setupConfig(globalState, urlSlice[0], cfg)
 
 	//normal main setup state call
-	SetupState(globalState)
+	globalState.SetupState()
 
 	//test wordlist to use
 	wordlist := `a
@@ -357,7 +369,7 @@ z
 	globalState.WordList = strings.Split(wordlist, "\n")
 	globalState.Cfg.Wordlist = "test"
 	globalState.DirbProgress = new(uint32)
-
+	stateObject = globalState
 	return
 }
 

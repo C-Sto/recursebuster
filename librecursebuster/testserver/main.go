@@ -54,17 +54,17 @@ const bod404 = `404 not found 20/20/19`
 const bod404mod = `404 not found 20/20/20`
 const bod200 = `200ish response! This should be different enough that it is not detected as being a soft 404, ideally anyway.`
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 
-	vMut.Lock()
+	ts.vMut.Lock()
 	//if it's been visited more than once, instant fail
-	if visited[r.Method+":"+r.URL.Path] && r.URL.Path != "/" {
+	if ts.visited[r.Method+":"+r.URL.Path] && r.URL.Path != "/" {
 		//we can visit the base url more than once
-		tes.Fail()
+		ts.tes.Fail()
 		panic("Path visited more than once: " + r.Method + ":" + r.URL.Path)
 	}
-	visited[r.Method+":"+r.URL.Path] = true
-	vMut.Unlock()
+	ts.visited[r.Method+":"+r.URL.Path] = true
+	ts.vMut.Unlock()
 
 	respCode := 404
 	switch strings.ToLower(r.URL.Path) {
@@ -207,18 +207,25 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(respCode)
 	fmt.Fprintln(w, bod)
-	fmt.Println(r.Method, r.URL, respCode, bod)
+	//fmt.Println(r.Method, r.URL, respCode, bod)
 }
 
-var tes *testing.T
+type TestServer struct {
+	tes     *testing.T
+	visited map[string]bool
+	vMut    *sync.RWMutex
+}
 
 //Start starts the test HTTP server
-func Start(port string, finishedTest, setup chan struct{}, t *testing.T) {
+func (TestServer) Start(port string, finishedTest, setup chan struct{}, t *testing.T) {
+
 	s := http.NewServeMux()
-	visited = make(map[string]bool)
-	vMut = &sync.RWMutex{}
-	tes = t
-	s.HandleFunc("/", handler)
+	ts := TestServer{
+		visited: make(map[string]bool),
+		vMut:    &sync.RWMutex{},
+		tes:     t,
+	}
+	s.HandleFunc("/", ts.handler)
 	go http.ListenAndServe("127.0.0.1:"+port, s)
 
 	for {
@@ -238,6 +245,3 @@ func Start(port string, finishedTest, setup chan struct{}, t *testing.T) {
 	close(setup)
 	<-finishedTest //this is an ultra gross hack :(
 }
-
-var visited map[string]bool
-var vMut *sync.RWMutex
