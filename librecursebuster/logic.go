@@ -131,8 +131,11 @@ func (gState *State) testURL(method string, urlString string, client *http.Clien
 	}
 
 	gState.wg.Add(1)
-	gState.Chans.confirmedChan <- SpiderPage{URL: urlString, Result: headResp, Reference: headResp.Request.URL}
-
+	if headResp == nil {
+		gState.Chans.confirmedChan <- SpiderPage{URL: urlString, Result: headResp, Reference: nil}
+	} else {
+		gState.Chans.confirmedChan <- SpiderPage{URL: urlString, Result: headResp, Reference: headResp.Request.URL}
+	}
 	if !gState.Cfg.NoSpider && good && !gState.Cfg.NoRecursion {
 		urls, err := getUrls(content)
 		if err != nil {
