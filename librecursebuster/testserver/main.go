@@ -53,6 +53,7 @@ y
 const bod404 = `404 not found 20/20/19`
 const bod404mod = `404 not found 20/20/20`
 const bod200 = `200ish response! This should be different enough that it is not detected as being a soft 404, ideally anyway.`
+const bodNeither = `Totally different response indicating soemthing interesting, but probably not a 404`
 
 func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 
@@ -154,6 +155,7 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 	case "/postbody":
 		if r.Method == "POST" && r.Body != nil {
 			bod, err := ioutil.ReadAll(r.Body)
+			r.Body = ioutil.NopCloser(bytes.NewBuffer(bod))
 			if err != nil {
 				panic(err)
 			}
@@ -169,21 +171,29 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 	default:
 		respCode = 404
 	}
-	bod := bod404
+
+	bod := bodNeither
 	if respCode == 200 {
 		bod = bod200
-	} else if strings.ToLower(string(r.URL.Path[len(r.URL.Path)-1])) == "x" {
+	}
+	if strings.HasSuffix(r.URL.Path, "/x") { // strings.ToLower(string(r.URL.Path[len(r.URL.Path)-1])) == "x" {
 		//404 body
 		bod = bod404
-	} else if strings.ToLower(string(r.URL.Path[len(r.URL.Path)-1])) == "y" {
+	}
+	if strings.HasSuffix(r.URL.Path, "/y") {
 		//modified 404
 		bod = bod404mod
+	}
+
+	if respCode == 404 {
+		bod = bod404
 	}
 
 	if respCode == 401 {
 		if u, p, ok := r.BasicAuth(); strings.ToLower(string(r.URL.Path[len(r.URL.Path)-1])) == "basicauth" &&
 			ok && u == "test" && p == "test" {
 			respCode = 200
+			bod = bod200
 		}
 	}
 
@@ -205,6 +215,7 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 	if strings.ToLower(r.URL.Path) == "/badheader/" {
 		w.Header().Add("X-Bad-Header", "test123")
 	}
+
 	w.WriteHeader(respCode)
 	fmt.Fprintln(w, bod)
 	//fmt.Println(r.Method, r.URL, respCode, bod)

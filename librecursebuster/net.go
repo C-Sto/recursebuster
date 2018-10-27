@@ -101,6 +101,7 @@ func (gState *State) HTTPReq(method, path string, client *http.Client) (resp *ht
 	}
 	defer resp.Body.Close()
 
+	//Set body to be readable again
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return resp, err
@@ -111,9 +112,7 @@ func (gState *State) HTTPReq(method, path string, client *http.Client) (resp *ht
 }
 
 func (gState *State) evaluateURL(method string, urlString string, client *http.Client) (headResp *http.Response, content []byte, success bool) {
-	success = true
-	//wg.Add(1)
-	//PrintOutput("EVALUATING:"+method+":"+urlString, Debug, 4, wg, printChan)
+
 	//optimize GET requests by sending a head first (it's cheaper)
 	if method == "GET" && !gState.Cfg.NoHead {
 		headResp, err := gState.HTTPReq("HEAD", urlString, client) //send a HEAD. Ignore body response
@@ -143,6 +142,7 @@ func (gState *State) evaluateURL(method string, urlString string, client *http.C
 
 	headResp, err := gState.HTTPReq(method, urlString, client)
 	content, _ = ioutil.ReadAll(headResp.Body)
+	headResp.Body = ioutil.NopCloser(bytes.NewBuffer(content))
 	<-gState.Chans.workersChan //done with the net thread
 	if err != nil {
 		success = false
@@ -151,12 +151,13 @@ func (gState *State) evaluateURL(method string, urlString string, client *http.C
 		return headResp, content, success
 	}
 
-	//Check if we care about it (header only) section
+	//Check if we care about it (response code only) section
 	if gState.BadResponses[headResp.StatusCode] {
 		success = false
 		return headResp, content, success
 	}
 
+	//check for bad headers in the response
 	if len(gState.Cfg.BadHeader) > 0 {
 		for _, x := range gState.Cfg.BadHeader {
 			spl := strings.Split(x, ":")
@@ -171,23 +172,17 @@ func (gState *State) evaluateURL(method string, urlString string, client *http.C
 			}
 		}
 	}
-	//if gState.BadHeaders[headResp.Header.]
-
-	//get content from validated path/file thing
-	if gState.Cfg.BurpMode {
-		gState.HTTPReq(method, urlString, gState.BurpClient)
-	}
 
 	//check we care about it (body only) section
 	//double check that it's not 404/error using smart blockchain AI tech
-	gState.PrintOutput(
-		fmt.Sprintf("Checking body for 404:\nContent: %v,\nSoft404:%v,\nResponse:%v",
-			string(content), string(gState.Hosts.Get404Body(headResp.Request.Host)),
-			detectSoft404(headResp, gState.Hosts.Get404(headResp.Request.Host), gState.Cfg.Ratio404)),
-		Debug, 4)
-	if detectSoft404(headResp, gState.Hosts.Get404(headResp.Request.Host), gState.Cfg.Ratio404) {
+	is404, _ := detectSoft404(headResp, gState.Hosts.Get404(headResp.Request.Host), gState.Cfg.Ratio404)
+	if is404 {
 		//seems to be a soft 404 lol
 		return headResp, content, false
+	}
+
+	if gState.Cfg.BurpMode {
+		gState.HTTPReq(method, urlString, gState.BurpClient)
 	}
 	return headResp, content, true
 }

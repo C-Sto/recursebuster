@@ -2,6 +2,7 @@ package librecursebuster
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -59,8 +60,8 @@ func TestBasicFunctionality(t *testing.T) {
 	}
 	for _, i := range ok200 {
 		tested = append(tested, i)
-		if x, ok := found[i]; !ok || !x {
-			panic("Did not find " + i)
+		if x, ok := found[i]; !ok || x == nil {
+			t.Error("Did not find " + i)
 		}
 	}
 	ok300 := []string{
@@ -68,8 +69,8 @@ func TestBasicFunctionality(t *testing.T) {
 	}
 	for _, i := range ok300 {
 		tested = append(tested, i)
-		if x, ok := found[i]; !ok || !x {
-			panic("Did not find " + i)
+		if x, ok := found[i]; !ok || x == nil {
+			t.Error("Did not find " + i)
 		}
 	}
 	ok400 := []string{
@@ -77,8 +78,8 @@ func TestBasicFunctionality(t *testing.T) {
 	}
 	for _, i := range ok400 {
 		tested = append(tested, i)
-		if x, ok := found[i]; !ok || !x {
-			panic("Did not find " + i)
+		if x, ok := found[i]; !ok || x == nil {
+			t.Error("Did not find " + i)
 		}
 	}
 	ok500 := []string{
@@ -86,17 +87,26 @@ func TestBasicFunctionality(t *testing.T) {
 	}
 	for _, i := range ok500 {
 		tested = append(tested, i)
-		if x, ok := found[i]; !ok || !x {
-			panic("Did not find " + i)
+		if x, ok := found[i]; !ok || x == nil {
+			t.Error("Did not find " + i)
 		}
 	}
 
 	//check for values that should not have been found
 	for k := range found {
 		if strings.Contains(k, "z") {
-			panic("Found (but should not have) " + k)
+			t.Error("Found (but should not have) " + k)
 		}
 	}
+
+	if x, ok := found["/a/x"]; ok && x != nil {
+		t.Error("Found (but should not have) /a/x")
+	}
+
+	if x, ok := found["/a/y"]; ok && x != nil {
+		t.Error("Found (but should not have) /a/x")
+	}
+
 	close(finished)
 }
 
@@ -111,8 +121,8 @@ func TestAppendSlash(t *testing.T) {
 	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
-	if x, ok := found["/appendslash/"]; !ok || !x {
-		panic("didn't find it?")
+	if x, ok := found["/appendslash/"]; !ok || x == nil {
+		t.Error("didn't find it?")
 	}
 	close(finished)
 }
@@ -128,8 +138,8 @@ func TestBasicAuth(t *testing.T) {
 	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
-	if x, ok := found["/a/b/c/basicauth"]; !ok || !x {
-		panic("Failed basic auth test!")
+	if x, ok := found["/a/b/c/basicauth"]; !ok || x == nil {
+		t.Error("Failed basic auth test!")
 	}
 
 }
@@ -146,7 +156,7 @@ func TestBadCodes(t *testing.T) {
 
 	for x := range found {
 		if strings.Contains(x, "badcode") {
-			panic("Failed bad header code test")
+			t.Error("Failed bad header code test")
 		}
 	}
 
@@ -165,7 +175,7 @@ func TestBadHeaders(t *testing.T) {
 
 	for x := range found {
 		if strings.Contains(x, "badheader") {
-			panic("Failed bad header code test")
+			t.Error("Failed bad header code test")
 		}
 	}
 
@@ -184,16 +194,16 @@ func TestAjax(t *testing.T) {
 	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
-	if x, ok := found["/ajaxonly"]; !ok || !x {
-		panic("Failed ajax header check")
+	if x, ok := found["/ajaxonly"]; !ok || x == nil {
+		t.Error("Failed ajax header check 1")
 	}
 
-	if x, ok := found["/ajaxpost"]; !ok || !x {
-		panic("Failed ajax header check")
+	if x, ok := found["/ajaxpost"]; !ok || x == nil {
+		t.Error("Failed ajax header check 2")
 	}
 
-	if x, ok := found["/onlynoajax"]; ok || x {
-		panic("Failed ajax header check")
+	if x, ok := found["/onlynoajax"]; ok && x != nil {
+		t.Error("Failed ajax header check 3")
 	}
 
 }
@@ -211,8 +221,8 @@ func TestBodyContent(t *testing.T) {
 	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
-	if x, ok := found["/postbody"]; !ok || !x {
-		panic("Failed body based request")
+	if x, ok := found["/postbody"]; !ok || x == nil {
+		t.Error("Failed body based request")
 	}
 }
 
@@ -227,12 +237,12 @@ func TestBlacklist(t *testing.T) {
 	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
-	if x, ok := found["/a/b"]; ok || x {
-		panic("Failed blacklist testing1")
+	if x, ok := found["/a/b"]; ok && x != nil {
+		t.Error("Failed blacklist testing1")
 	}
 
-	if x, ok := found["/a/b/c"]; ok || x {
-		panic("Failed blacklist testing2")
+	if x, ok := found["/a/b/c"]; ok && x != nil {
+		t.Error("Failed blacklist testing2")
 	}
 }
 
@@ -246,8 +256,8 @@ func TestCookies(t *testing.T) {
 	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
-	if x, ok := found["/cookiesonly"]; !ok || !x {
-		panic("Failed Cookie test")
+	if x, ok := found["/cookiesonly"]; !ok || x == nil {
+		t.Error("Failed Cookie test")
 	}
 }
 func TestExt(t *testing.T) {
@@ -259,20 +269,48 @@ func TestExt(t *testing.T) {
 	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
 
-	if x, ok := found["/a.exe"]; !ok || !x {
-		panic("Failed Ext test1")
+	if x, ok := found["/a.exe"]; !ok || x == nil {
+		t.Error("Failed Ext test1")
 	}
 
-	if x, ok := found["/a.aspx"]; !ok || !x {
-		panic("Failed Ext test2")
+	if x, ok := found["/a.aspx"]; !ok || x == nil {
+		t.Error("Failed Ext test2")
 	}
 
-	if x, ok := found["/a.csv"]; !ok || !x {
-		panic("Failed Ext test3")
+	if x, ok := found["/a.csv"]; !ok || x == nil {
+		t.Error("Failed Ext test3")
 	}
 }
 
-func postSetupTest(urlSlice []string, gState *State) (found map[string]bool) {
+func TestOutAll(t *testing.T) {
+	// sets all responses as 'found' for the purposes of output. Should not pass any logic tests for adding additional URLs etc
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.ShowAll = true
+	gState, urlsSlice := preSetupTest(cfg, "2011", finished, t)
+	found := postSetupTest(urlsSlice, gState)
+	gState.Wait()
+
+	//Check the 404's were received and set as found
+	if x, ok := found["/a/x/c"]; ok && x != nil {
+		fmt.Println("/a/x/c:", x)
+		fmt.Println("/a/x", found["/a/x"])
+		t.Error("Failed OutAll Test 1, performed check on non-existent prefix")
+	}
+
+	if x, ok := found["/x"]; ok && x != nil {
+		//have 404 response in found set
+		if x.StatusCode != 404 {
+			t.Error("Failed OutAll Test 3, got unexpected response recorded for 404 check")
+		}
+	} else {
+		//didn't have '/a/x' (soft 404) in found set
+		t.Error("Failed OutAll Test 2, did not have 404 response in found set")
+	}
+}
+
+func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Response) {
 	//start up the management goroutines
 	go gState.ManageRequests()
 	go gState.ManageNewURLs()
@@ -306,7 +344,7 @@ func postSetupTest(urlSlice []string, gState *State) (found map[string]bool) {
 	}()
 
 	//use the found map to determine later on if we have found the expected URL's
-	found = make(map[string]bool)
+	found = make(map[string]*http.Response)
 	go func() {
 		t := time.NewTicker(1 * time.Second).C
 		for {
@@ -318,7 +356,7 @@ func postSetupTest(urlSlice []string, gState *State) (found map[string]bool) {
 					gState.wg.Done()
 					panic(e)
 				}
-				found[u.Path] = true
+				found[u.Path] = x.Result
 				gState.wg.Done()
 				//fmt.Println("CONFIRMED!", x)
 			case <-t:

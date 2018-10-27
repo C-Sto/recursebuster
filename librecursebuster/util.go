@@ -45,16 +45,18 @@ func getUrls(page []byte) ([]string, error) {
 	return ret, nil
 }
 
-func detectSoft404(r1 *http.Response, r2 *http.Response, ratio float64) bool {
+func detectSoft404(r1 *http.Response, r2 *http.Response, ratio float64) (bool, float64) {
 	//a, b := []byte{}
 	if r1 != nil && r2 != nil {
-		if r1.ContentLength > 0 && r2.ContentLength > 0 &&
-			r1.StatusCode == r2.StatusCode {
+		if r1.ContentLength > 0 && r2.ContentLength > 0 { //&&
+			//r1.StatusCode == r2.StatusCode {
 			a, e := ioutil.ReadAll(r1.Body)
+			r1.Body = ioutil.NopCloser(bytes.NewBuffer(a))
 			if e != nil {
 				panic(e)
 			}
 			b, e := ioutil.ReadAll(r2.Body)
+			r2.Body = ioutil.NopCloser(bytes.NewBuffer(b))
 			if e != nil {
 				panic(e)
 			}
@@ -63,11 +65,11 @@ func detectSoft404(r1 *http.Response, r2 *http.Response, ratio float64) bool {
 			perc := (longer - dist) / longer
 			if perc > ratio {
 				//if diff.QuickRatio() > ratio {
-				return true
+				return true, perc
 			}
 		}
 	}
-	return false
+	return false, 0
 }
 
 //todo: test this is correct
@@ -86,7 +88,11 @@ func levenshteinDistance(s []byte, t []byte) int {
 	if len(t) == 0 {
 		return len(s)
 	}
-
+	if len(s) < len(t) {
+		temp := s
+		s = t
+		t = temp
+	}
 	// create two work vectors of integer distances
 	v0 := make([]int, len(t)+1)
 	v1 := make([]int, len(t)+1)

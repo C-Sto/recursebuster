@@ -1,6 +1,7 @@
 package librecursebuster
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -171,7 +172,8 @@ func (gState *State) dirBust(page SpiderPage) {
 		h, _, res := gState.evaluateURL(gState.Methods[0], page.URL+RandString(), gState.Client)
 		//fmt.Println(page.URL, h, res)
 		if res { //true response indicates a good response for a guid path, unlikely good
-			if detectSoft404(h, gState.Hosts.Get404(u.Host), gState.Cfg.Ratio404) {
+			is404, _ := detectSoft404(h, gState.Hosts.Get404(u.Host), gState.Cfg.Ratio404)
+			if is404 {
 				//it's a soft404 probably, guess we can continue (this logic seems wrong??)
 			} else {
 				gState.PrintOutput(
@@ -277,6 +279,7 @@ func (gState *State) StartBusting(randURL string, u url.URL) {
 			Debug, 2,
 		)
 		content, _ := ioutil.ReadAll(resp.Body)
+		resp.Body = ioutil.NopCloser(bytes.NewBuffer(content))
 		gState.Hosts.AddSoft404Content(u.Host, content, resp) // Soft404ResponseBody = xx
 	} else {
 		<-gState.Chans.workersChan
