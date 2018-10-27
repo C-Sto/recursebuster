@@ -142,6 +142,18 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			respCode = 404
 		}
+	case "/customheaderonly":
+		if r.Header.Get("X-ATT-DeviceId") == "XXXXX" {
+			respCode = 200
+		} else {
+			respCode = 404
+		}
+	case "/onlynocustomheader":
+		if r.Header.Get("X-ATT-DeviceId") == "XXXXX" {
+			respCode = 404
+		} else {
+			respCode = 200
+		}
 	case "/cookiesonly":
 		x, err := r.Cookie("lol")
 		if err == nil && x.Value != "ok" {

@@ -282,7 +282,7 @@ func TestExt(t *testing.T) {
 	}
 }
 
-func TestOutAll(t *testing.T) {
+func TestAllOut(t *testing.T) {
 	// sets all responses as 'found' for the purposes of output. Should not pass any logic tests for adding additional URLs etc
 	t.Parallel()
 	finished := make(chan struct{})
@@ -337,6 +337,29 @@ func TestCanary(t *testing.T) {
 
 	if x, ok := found["/a/y"]; !ok || x == nil {
 		t.Error("Failed Canary Test 4, didn't find old modified soft 404 (/a/y)")
+	}
+
+}
+
+func TestHeaders(t *testing.T) {
+	//check for custom header workyness
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.Headers = ArrayStringFlag{}
+	cfg.Headers.Set("X-ATT-DeviceId:XXXXX")
+	gState, urlSlice := preSetupTest(cfg, "2013", finished, t)
+	gState.WordList = append(gState.WordList, "customheaderonly")
+	gState.WordList = append(gState.WordList, "onlynocustomheader")
+	found := postSetupTest(urlSlice, gState)
+	gState.Wait()
+
+	if x, ok := found["/customheaderonly"]; !ok || x == nil {
+		t.Error("Failed Custom header check 1, didn't find a path it should have")
+	}
+
+	if x, ok := found["/onlynocustomheader"]; ok && x != nil {
+		t.Error("Failed Custom header check 2, found the path it shouldn't have")
 	}
 
 }
