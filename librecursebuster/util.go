@@ -72,7 +72,6 @@ func detectSoft404(r1 *http.Response, r2 *http.Response, ratio float64) (bool, f
 	return false, 0
 }
 
-//todo: test this is correct
 func levenshteinDistance(s []byte, t []byte) int {
 	//A+ props to codingo for constantly saying this would be a good idea, eventually I listened I guess?
 	//https://gist.github.com/laurent22/8025413 with edits for byte comparisons

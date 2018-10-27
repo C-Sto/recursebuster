@@ -294,8 +294,6 @@ func TestOutAll(t *testing.T) {
 
 	//Check the 404's were received and set as found
 	if x, ok := found["/a/x/c"]; ok && x != nil {
-		fmt.Println("/a/x/c:", x)
-		fmt.Println("/a/x", found["/a/x"])
 		t.Error("Failed OutAll Test 1, performed check on non-existent prefix")
 	}
 
@@ -308,6 +306,39 @@ func TestOutAll(t *testing.T) {
 		//didn't have '/a/x' (soft 404) in found set
 		t.Error("Failed OutAll Test 2, did not have 404 response in found set")
 	}
+}
+
+func TestCanary(t *testing.T) {
+	// check that the canary response is respected, and set as the soft-404 check
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.Canary = "canarystringvalue"
+	gState, urlsSlice := preSetupTest(cfg, "2012", finished, t)
+	gState.WordList = append(gState.WordList, "canarystringvalue")
+	gState.WordList = append(gState.WordList, "canarysimilar")
+	found := postSetupTest(urlsSlice, gState)
+	gState.Wait()
+
+	//check canary value didn't somehow work
+	if x, ok := found["/canarystringvalue"]; ok && x != nil {
+		t.Error("Failed Canary Test 1, server responded good to canarystringvalue (and was found??)")
+	}
+
+	//check canarysimilar is not set as valid response
+	if x, ok := found["/canarysimilar"]; ok && x != nil {
+		t.Error("Failed Canary Test 2, server responded good to canarystringvalue (and was found??)")
+	}
+
+	//since we set the canary to something different, we should record a found for the other soft-404's
+	if x, ok := found["/a/x"]; !ok || x == nil {
+		t.Error("Failed Canary Test 3, didn't find old soft 404 (/a/x)")
+	}
+
+	if x, ok := found["/a/y"]; !ok || x == nil {
+		t.Error("Failed Canary Test 4, didn't find old modified soft 404 (/a/y)")
+	}
+
 }
 
 func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Response) {

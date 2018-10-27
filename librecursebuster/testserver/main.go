@@ -54,6 +54,8 @@ const bod404 = `404 not found 20/20/19`
 const bod404mod = `404 not found 20/20/20`
 const bod200 = `200ish response! This should be different enough that it is not detected as being a soft 404, ideally anyway.`
 const bodNeither = `Totally different response indicating soemthing interesting, but probably not a 404`
+const bodCanary1 = `Definitely a Canary response, should be sent with 404 for the canary value`
+const bodCanary2 = `similar to a Canary response, should be sent with 200 for the canary value`
 
 func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 
@@ -167,7 +169,10 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			respCode = 404
 		}
-
+	case "/canarystringvalue":
+		respCode = 404
+	case "/canarysimilar":
+		respCode = 200
 	default:
 		respCode = 404
 	}
@@ -187,6 +192,14 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 
 	if respCode == 404 {
 		bod = bod404
+	}
+
+	if r.URL.Path == "/canarystringvalue" {
+		bod = bodCanary1
+	}
+
+	if r.URL.Path == "/canarysimilar" {
+		bod = bodCanary2
 	}
 
 	if respCode == 401 {
@@ -215,6 +228,10 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 	if strings.ToLower(r.URL.Path) == "/badheader/" {
 		w.Header().Add("X-Bad-Header", "test123")
 	}
+
+	//if strings.ToLower(r.URL.Path) == "/a/x" {
+	//	fmt.Println(respCode, string(bod))
+	//}
 
 	w.WriteHeader(respCode)
 	fmt.Fprintln(w, bod)
