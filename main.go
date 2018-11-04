@@ -103,18 +103,9 @@ func main() {
 		uiWG.Wait()
 	}
 
-	if globalState.Cfg.NoUI {
-		globalState.PrintBanner()
-		go globalState.StatusPrinter()
-	} else {
-		go globalState.UIPrinter()
-	}
-	go globalState.ManageRequests()
-	go globalState.ManageNewURLs()
-	go globalState.OutputWriter(globalState.Cfg.Localpath)
-	go globalState.StatsTracker()
+	globalState.StartManagers()
 
-	globalState.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0)
+	globalState.PrintOutput("Starting recursebuster...", librecursebuster.Info, 0)
 
 	//seed the workers
 	for _, s := range urlSlice {
@@ -142,7 +133,7 @@ func main() {
 			prefix = prefix + "/"
 		}
 		randURL := fmt.Sprintf("%s%s", prefix, globalState.Cfg.Canary)
-		globalState.Chans.GetWorkers() <- struct{}{}
+		//globalState.Chans.GetWorkers() <- struct{}{}
 		globalState.AddWG()
 		go globalState.StartBusting(randURL, *u)
 

@@ -10,6 +10,23 @@ import (
 	"sync/atomic"
 )
 
+//StartManagers is the function that starts all the management goroutines
+func (gState *State) StartManagers() {
+	if gState.Cfg.NoUI {
+		gState.PrintBanner()
+		go gState.StatusPrinter()
+	} else {
+		go gState.UIPrinter()
+	}
+	go gState.ManageRequests()
+	go gState.ManageNewURLs()
+	go gState.OutputWriter(gState.Cfg.Localpath)
+	go gState.StatsTracker()
+	for x := 0; x < gState.Cfg.Threads; x++ {
+		go gState.testWorker()
+	}
+}
+
 //ManageRequests handles the request workers
 func (gState *State) ManageRequests() {
 	//manages net request workers
@@ -22,15 +39,15 @@ func (gState *State) ManageRequests() {
 		}
 		for _, method := range gState.Methods {
 			if page.Result == nil && !gState.Cfg.NoBase {
-				gState.Chans.workersChan <- struct{}{}
 				gState.wg.Add(1)
-				go gState.testURL(method, page.URL, gState.Client)
+				//go gState.testURL(method, page.URL, gState.Client)
+				gState.Chans.workersChan <- workUnit{
+					Method:    method,
+					URLString: page.URL,
+					//Client:    gState.Client,
+				}
 			}
 			if gState.Cfg.Wordlist != "" && string(page.URL[len(page.URL)-1]) == "/" { //if we are testing a directory
-
-				//check for wildcard response
-
-				//	maxDirs <- struct{}{}
 				gState.dirBust(page)
 			}
 		}
@@ -110,6 +127,19 @@ func (gState *State) ManageNewURLs() {
 	}
 }
 
+type workUnit struct {
+	Method    string
+	URLString string
+	//Client    *http.Client
+}
+
+func (gState *State) testWorker() {
+	for {
+		w := <-gState.Chans.workersChan
+		gState.testURL(w.Method, w.URLString, gState.Client)
+	}
+}
+
 func (gState *State) testURL(method string, urlString string, client *http.Client) {
 	defer func() {
 		gState.wg.Done()
@@ -119,6 +149,7 @@ func (gState *State) testURL(method string, urlString string, client *http.Clien
 	case gState.Chans.testChan <- method + ":" + urlString:
 	default: //this is to prevent blocking, it doesn't _really_ matter if it doesn't get written to output
 	}
+	//gState.Chans.workersChan <- struct{}{}
 	headResp, content, good := gState.evaluateURL(method, urlString, client)
 
 	if !good && !gState.Cfg.ShowAll {
@@ -168,7 +199,7 @@ func (gState *State) dirBust(page SpiderPage) {
 	}
 	//check to make sure we aren't dirbusting a wildcardyboi (NOTE!!! USES FIRST SPECIFIED MEHTOD TO DO SOFT 404!)
 	if !gState.Cfg.NoWildcardChecks {
-		gState.Chans.workersChan <- struct{}{}
+		//gState.Chans.workersChan <- struct{}{}
 		h, _, res := gState.evaluateURL(gState.Methods[0], page.URL+RandString(), gState.Client)
 		//fmt.Println(page.URL, h, res)
 		if res { //true response indicates a good response for a guid path, unlikely good
@@ -215,9 +246,12 @@ func (gState *State) dirBust(page SpiderPage) {
 							gState.CMut.Unlock()
 							continue
 						}
-						gState.Chans.workersChan <- struct{}{}
 						gState.wg.Add(1)
-						go gState.testURL(method, page.URL+word+"."+ext, gState.Client)
+						gState.Chans.workersChan <- workUnit{
+							Method:    method,
+							URLString: page.URL + word + "." + ext,
+						}
+						//go gState.testURL(method, page.URL+word+"."+ext, gState.Client)
 						gState.Checked[method+page.URL+word+"."+ext] = true
 						gState.CMut.Unlock()
 					}
@@ -228,9 +262,12 @@ func (gState *State) dirBust(page SpiderPage) {
 						gState.CMut.Unlock()
 						continue
 					}
-					gState.Chans.workersChan <- struct{}{}
 					gState.wg.Add(1)
-					go gState.testURL(method, page.URL+word+"/", gState.Client)
+					gState.Chans.workersChan <- workUnit{
+						Method:    method,
+						URLString: page.URL + word + "/",
+					}
+					//go gState.testURL(method, page.URL+word+"/", gState.Client)
 					gState.Checked[method+page.URL+word+"/"] = true
 					gState.CMut.Unlock()
 				}
@@ -239,9 +276,12 @@ func (gState *State) dirBust(page SpiderPage) {
 					gState.CMut.Unlock()
 					continue
 				}
-				gState.Chans.workersChan <- struct{}{}
 				gState.wg.Add(1)
-				go gState.testURL(method, page.URL+word, gState.Client)
+				gState.Chans.workersChan <- workUnit{
+					Method:    method,
+					URLString: page.URL + word,
+				}
+				//go gState.testURL(method, page.URL+word, gState.Client)
 				gState.Checked[method+page.URL+word] = true
 				gState.CMut.Unlock()
 				//if gState.Cfg.MaxDirs == 1 {
@@ -261,7 +301,7 @@ func (gState *State) StartBusting(randURL string, u url.URL) {
 	defer gState.wg.Done()
 	if !gState.Cfg.NoWildcardChecks {
 		resp, err := gState.HTTPReq("GET", randURL, gState.Client)
-		<-gState.Chans.workersChan
+		//<-gState.Chans.workersChan
 		if err != nil {
 			if gState.Cfg.InputList != "" {
 				gState.PrintOutput(
@@ -282,7 +322,7 @@ func (gState *State) StartBusting(randURL string, u url.URL) {
 		resp.Body = ioutil.NopCloser(bytes.NewBuffer(content))
 		gState.Hosts.AddSoft404Content(u.Host, content, resp) // Soft404ResponseBody = xx
 	} else {
-		<-gState.Chans.workersChan
+		//<-gState.Chans.workersChan
 	}
 	x := SpiderPage{}
 	x.URL = u.String()

@@ -113,12 +113,13 @@ type chans struct {
 	newPagesChan,
 	confirmedChan chan SpiderPage
 
-	workersChan chan struct{}
+	//workersChan chan struct{}
+	workersChan chan workUnit
 	printChan   chan OutLine
 	testChan    chan string
 }
 
-func (c *chans) GetWorkers() chan struct{} {
+func (c *chans) GetWorkers() chan workUnit {
 	return c.workersChan
 }
 
@@ -127,7 +128,7 @@ func (chans) Init() *chans {
 		pagesChan:     make(chan SpiderPage, 1000),
 		newPagesChan:  make(chan SpiderPage, 10000),
 		confirmedChan: make(chan SpiderPage, 1000),
-		//workersChan:   make(chan struct{}, workerCount),
+		workersChan:   make(chan workUnit, 1000),
 		//maxDirs := make(chan struct{}, cfg.MaxDirs),
 		testChan:  make(chan string, 100),
 		printChan: make(chan OutLine, 100),
@@ -331,7 +332,7 @@ type SpiderPage struct {
 func (gState *State) SetupState() {
 
 	//set workers (whoops)
-	gState.Chans.workersChan = make(chan struct{}, gState.Cfg.Threads)
+	//gState.Chans.workersChan = make(chan struct{}, gState.Cfg.Threads)
 
 	if gState.Cfg.Ajax {
 		gState.Cfg.Headers = append(gState.Cfg.Headers, "X-Requested-With:XMLHttpRequest")

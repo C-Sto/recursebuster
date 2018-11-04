@@ -118,7 +118,7 @@ func (gState *State) evaluateURL(method string, urlString string, client *http.C
 		headResp, err := gState.HTTPReq("HEAD", urlString, client) //send a HEAD. Ignore body response
 		if err != nil {
 			success = false
-			<-gState.Chans.workersChan //done with the net thread
+			//<-gState.Chans.workersChan //done with the net thread
 			gState.PrintOutput(fmt.Sprintf("%s", err), Error, 0)
 			return headResp, content, success
 		}
@@ -126,7 +126,7 @@ func (gState *State) evaluateURL(method string, urlString string, client *http.C
 		//Check if we care about it (header only) section
 		if gState.BadResponses[headResp.StatusCode] {
 			success = false
-			<-gState.Chans.workersChan
+			//<-gState.Chans.workersChan
 			return headResp, content, success
 		}
 
@@ -135,7 +135,7 @@ func (gState *State) evaluateURL(method string, urlString string, client *http.C
 			if gState.Cfg.BurpMode { //send successful request again... twice as many requests, but less burp spam
 				gState.HTTPReq("HEAD", urlString, gState.BurpClient) //send a HEAD. Ignore body response
 			}
-			<-gState.Chans.workersChan
+			//<-gState.Chans.workersChan
 			return headResp, content, success
 		}
 	}
@@ -143,7 +143,7 @@ func (gState *State) evaluateURL(method string, urlString string, client *http.C
 	headResp, err := gState.HTTPReq(method, urlString, client)
 	content, _ = ioutil.ReadAll(headResp.Body)
 	headResp.Body = ioutil.NopCloser(bytes.NewBuffer(content))
-	<-gState.Chans.workersChan //done with the net thread
+	//<-gState.Chans.workersChan //done with the net thread
 	if err != nil {
 		success = false
 		gState.PrintOutput(fmt.Sprintf("%s", err), Error, 0)
