@@ -14,7 +14,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.5.16"
+const version = "1.5.17"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -23,8 +23,6 @@ func main() {
 	} else {
 		librecursebuster.InitLogger(os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stderr)
 	}
-
-	//globalState.Cfg := &librecursebuster.Config{}
 
 	//the state should probably change per different host. eventually
 	globalState := librecursebuster.State{}.Init()

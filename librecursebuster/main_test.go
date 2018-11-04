@@ -368,6 +368,7 @@ func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Res
 	//start up the management goroutines
 	go gState.ManageRequests()
 	go gState.ManageNewURLs()
+	go gState.testWorker() //single thread only - todo: when doing multithread tests make this gooder
 
 	//default turn url into a url object call
 	u, err := url.Parse(urlSlice[0])
@@ -382,7 +383,7 @@ func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Res
 	}
 	randURL := fmt.Sprintf("%s%s", prefix, gState.Cfg.Canary)
 	gState.AddWG()
-	gState.Chans.GetWorkers() <- struct{}{}
+	//gState.Chans.GetWorkers() <- struct{}{}
 	go gState.StartBusting(randURL, *u)
 
 	//start the print channel (so that we can see output if a test fails)
