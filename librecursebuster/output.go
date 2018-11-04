@@ -177,7 +177,6 @@ func (gState *State) writeStatus(s string) {
 	fmt.Fprintln(v, "ctrl + [(c) quit, (x) stop current dir], (arrow up/down) move one line, (pgup/pgdown) move 10 lines")
 	fmt.Fprintln(v, time.Now().String())
 	return //nil
-	//})
 }
 
 //StatusPrinter is the function that performs all the status printing logic

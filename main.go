@@ -14,7 +14,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.5.16"
+const version = "1.5.17"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -23,8 +23,6 @@ func main() {
 	} else {
 		librecursebuster.InitLogger(os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stderr)
 	}
-
-	//globalState.Cfg := &librecursebuster.Config{}
 
 	//the state should probably change per different host. eventually
 	globalState := librecursebuster.State{}.Init()
@@ -103,18 +101,9 @@ func main() {
 		uiWG.Wait()
 	}
 
-	if globalState.Cfg.NoUI {
-		globalState.PrintBanner()
-		go globalState.StatusPrinter()
-	} else {
-		go globalState.UIPrinter()
-	}
-	go globalState.ManageRequests()
-	go globalState.ManageNewURLs()
-	go globalState.OutputWriter(globalState.Cfg.Localpath)
-	go globalState.StatsTracker()
+	globalState.StartManagers()
 
-	globalState.PrintOutput("Starting recursebuster...     ", librecursebuster.Info, 0)
+	globalState.PrintOutput("Starting recursebuster...", librecursebuster.Info, 0)
 
 	//seed the workers
 	for _, s := range urlSlice {
@@ -142,7 +131,7 @@ func main() {
 			prefix = prefix + "/"
 		}
 		randURL := fmt.Sprintf("%s%s", prefix, globalState.Cfg.Canary)
-		globalState.Chans.GetWorkers() <- struct{}{}
+		//globalState.Chans.GetWorkers() <- struct{}{}
 		globalState.AddWG()
 		go globalState.StartBusting(randURL, *u)
 
