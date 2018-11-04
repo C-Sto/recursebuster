@@ -166,16 +166,21 @@ func (gState *State) writeStatus(s string) {
 		// handle error
 	}
 	v.Clear()
-	fmt.Fprintln(v, gState.getStatus())
+	//fmt.Fprintln(v, gState.getStatus())
+	timeFormat := "%s (+%vs) " + gState.getStatus()
+	fmt.Fprintln(v, fmt.Sprintf(timeFormat, time.Now().Format("2006-01-02 15:04:05"), int(time.Since(gState.StartTime).Seconds())))
 	sprint := ""
 	if len(gState.WordList) > 0 {
-		sprint = fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(len(gState.WordList)), s)
+		sprint = fmt.Sprintf("[%.2f%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(len(gState.WordList)), s)
 	} else {
 		sprint = fmt.Sprintf("Waiting on %v items", gState.wg)
 	}
+	fmt.Fprintln(v, "ctrl + (c) Quit, (x) Stop current dir, (arrow up|down) Move one line, (pgup|pgdown) Move 10 lines")
+	fmt.Fprintln(v, "ctrl + (t) Add worker, (y) Remove worker")
 	fmt.Fprintln(v, sprint)
-	fmt.Fprintln(v, "ctrl + [(c) quit, (x) stop current dir], (arrow up/down) move one line, (pgup/pgdown) move 10 lines")
-	fmt.Fprintln(v, time.Now().String())
+	//Time format: yyyy-mm-dd hh:mm:ss tz (elapsed seconds)
+	//2018-11-04 18:13:40.6721974 +0800 AWST m=+4.232677701
+	//time.Now().cl
 	return //nil
 }
 
@@ -245,7 +250,8 @@ func (gState *State) StatusPrinter() {
 }
 
 func (gState *State) getStatus() string {
-	return fmt.Sprintf("Tested: %d Speed(2s): %d/s Speed: %d/s",
+	return fmt.Sprintf("Workers: %d Tested: %d Speed(2s): %d/s Speed: %d/s",
+		atomic.LoadUint32(gState.workerCount),
 		atomic.LoadUint64(gState.TotalTested),
 		atomic.LoadUint64(gState.PerSecondShort),
 		atomic.LoadUint64(gState.PerSecondLong),

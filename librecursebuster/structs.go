@@ -113,10 +113,10 @@ type chans struct {
 	newPagesChan,
 	confirmedChan chan SpiderPage
 
-	//workersChan chan struct{}
-	workersChan chan workUnit
-	printChan   chan OutLine
-	testChan    chan string
+	workersChan     chan workUnit
+	lessWorkersChan chan struct{}
+	printChan       chan OutLine
+	testChan        chan string
 }
 
 func (c *chans) GetWorkers() chan workUnit {
@@ -125,10 +125,11 @@ func (c *chans) GetWorkers() chan workUnit {
 
 func (chans) Init() *chans {
 	return &chans{
-		pagesChan:     make(chan SpiderPage, 1000),
-		newPagesChan:  make(chan SpiderPage, 10000),
-		confirmedChan: make(chan SpiderPage, 1000),
-		workersChan:   make(chan workUnit, 1000),
+		pagesChan:       make(chan SpiderPage, 1000),
+		newPagesChan:    make(chan SpiderPage, 10000),
+		confirmedChan:   make(chan SpiderPage, 1000),
+		workersChan:     make(chan workUnit, 1000),
+		lessWorkersChan: make(chan struct{}, 5), //too bad if you want to add more than 5 at a time ok
 		//maxDirs := make(chan struct{}, cfg.MaxDirs),
 		testChan:  make(chan string, 100),
 		printChan: make(chan OutLine, 100),
@@ -146,6 +147,7 @@ type State struct {
 	TotalTested    *uint64
 	PerSecondShort *uint64 //how many tested over 2 seconds or so
 	PerSecondLong  *uint64
+	workerCount    *uint32 //probably doesn't need to be async safe, but whatever
 	StartTime      time.Time
 	Blacklist      map[string]bool
 	Whitelist      map[string]bool
@@ -398,7 +400,8 @@ func (gState *State) SetupState() {
 			//atomic.AddUint32(gState.WordlistLen, 1)
 		}
 	}
-
+	workers := uint32(gState.Cfg.Threads)
+	gState.workerCount = &workers
 	gState.StartTime = time.Now()
 	gState.PerSecondShort = new(uint64)
 	gState.PerSecondLong = new(uint64)

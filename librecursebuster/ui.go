@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	ui "github.com/jroimartin/gocui"
 )
@@ -46,7 +47,18 @@ func (s *State) StartUI(uiWG *sync.WaitGroup, quitChan chan struct{}) {
 	err = s.ui.SetKeybinding("", ui.KeyArrowDown, ui.ModNone, scrollDown)
 	if err != nil {
 		panic(err)
-	} /* Mouse stuff broke copying out of the terminal... not ideal
+	}
+
+	err = s.ui.SetKeybinding("", ui.KeyCtrlT, ui.ModNone, s.addWorker)
+	if err != nil {
+		panic(err)
+	}
+
+	err = s.ui.SetKeybinding("", ui.KeyCtrlY, ui.ModNone, s.stopWorker) //wtf? no shift modifier??
+	if err != nil {
+		panic(err)
+	}
+	/* Mouse stuff broke copying out of the terminal... not ideal
 	err = s.ui.SetKeybinding("", ui.MouseWheelUp, ui.ModNone, scrollUp)
 	if err != nil {
 		panic(err)
@@ -60,6 +72,23 @@ func (s *State) StartUI(uiWG *sync.WaitGroup, quitChan chan struct{}) {
 	if err != nil && err != ui.ErrQuit {
 		panic(err)
 	}
+}
+
+func (gState *State) addWorker(g *ui.Gui, v *ui.View) error {
+	atomic.AddUint32(gState.workerCount, 1)
+	go gState.testWorker()
+	return nil
+}
+
+func (gState *State) stopWorker(g *ui.Gui, v *ui.View) error {
+	count := atomic.LoadUint32(gState.workerCount)
+	if count == 0 { //avoid underflow
+		return nil
+	}
+	count = count - 1
+	atomic.StoreUint32(gState.workerCount, count)
+	gState.Chans.lessWorkersChan <- struct{}{}
+	return nil
 }
 
 //StopUI should be called when closing the program. It prints out the lines in the main view buffer to stdout, and closes the ui object

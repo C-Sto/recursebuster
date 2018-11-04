@@ -135,8 +135,12 @@ type workUnit struct {
 
 func (gState *State) testWorker() {
 	for {
-		w := <-gState.Chans.workersChan
-		gState.testURL(w.Method, w.URLString, gState.Client)
+		select {
+		case w := <-gState.Chans.workersChan:
+			gState.testURL(w.Method, w.URLString, gState.Client)
+		case <-gState.Chans.lessWorkersChan:
+			return
+		}
 	}
 }
 
@@ -144,6 +148,9 @@ func (gState *State) testURL(method string, urlString string, client *http.Clien
 	defer func() {
 		gState.wg.Done()
 		atomic.AddUint64(gState.TotalTested, 1)
+		if gState.DirbProgress != nil { //shoudl probably check if there is a wordlist, but this will do..
+			atomic.AddUint32(gState.DirbProgress, 1)
+		}
 	}()
 	select {
 	case gState.Chans.testChan <- method + ":" + urlString:
@@ -285,7 +292,6 @@ func (gState *State) dirBust(page SpiderPage) {
 				gState.Checked[method+page.URL+word] = true
 				gState.CMut.Unlock()
 				//if gState.Cfg.MaxDirs == 1 {
-				atomic.AddUint32(gState.DirbProgress, 1)
 				//}
 			}
 		}
