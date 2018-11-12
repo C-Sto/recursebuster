@@ -142,6 +142,18 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			respCode = 200
 		}
+	case "/postonly":
+		if r.Method == "POST" {
+			respCode = 404
+		} else {
+			respCode = 200
+		}
+	case "/catpicturesmethod":
+		if r.Method == "CATPICTURESPLEASE" {
+			respCode = 404
+		} else {
+			respCode = 200
+		}
 	case "/ajaxpost":
 		if r.Header.Get("X-Requested-With") == "XMLHttpRequest" &&
 			r.Method == "POST" {

@@ -419,6 +419,60 @@ func TestNoRecursion(t *testing.T) {
 	//todo: add more recursive things here to make sure it's not doing the thing
 }
 
+func TestNoSpider(t *testing.T) {
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.NoSpider = true
+	gState, urlSlice := preSetupTest(cfg, "2017", finished, t)
+	found := postSetupTest(urlSlice, gState)
+	gState.Wait()
+
+	if x, ok := found["/spideronly"]; ok && x != nil {
+		t.Error("Failed check 1, found a path it shouldn't have")
+	}
+}
+
+func TestNoWildcard(t *testing.T) {
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.NoWildcardChecks = true
+	gState, urlSlice := preSetupTest(cfg, "2018", finished, t)
+	found := postSetupTest(urlSlice, gState)
+	gState.Wait()
+
+	//should find /a/x and /a/y
+	if x, ok := found["/a/x"]; !ok || x == nil {
+		t.Error("Failed check 1, didn't find a path it should have")
+	}
+
+	if x, ok := found["/a/y"]; !ok || x == nil {
+		t.Error("Failed check 2, didn't find a path it should have")
+	}
+}
+
+func TestMethods(t *testing.T) {
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.Methods = "GET,POST,CATPICTURESPLEASE"
+	gState, urlSlice := preSetupTest(cfg, "2019", finished, t)
+	gState.WordList = append(gState.WordList, "postonly")
+	gState.WordList = append(gState.WordList, "catpicturesmethod")
+	found := postSetupTest(urlSlice, gState)
+	gState.Wait()
+
+	//should find /a/x and /a/y
+	if x, ok := found["/postonly"]; !ok || x == nil {
+		t.Error("Failed check 1, didn't find a path it should have")
+	}
+
+	if x, ok := found["/catpicturesmethod"]; !ok || x == nil {
+		t.Error("Failed check 2, didn't find a path it should have")
+	}
+}
+
 func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Response) {
 	//start up the management goroutines
 	go gState.ManageRequests()
