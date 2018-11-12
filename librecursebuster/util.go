@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -130,25 +131,48 @@ func levenshteinDistance(s []byte, t []byte) int {
 	return v1[len(t)]
 }
 
+//cleanURL will do some lexical cleaning of the URL - removing dots where relevant etc. Takes in the URL object contianing the path, and the base to append the path to
 func cleanURL(u *url.URL, actualURL string) string {
+
+	//work out if the URL was parsed using an opaque thing (no slash after scheme - probably due to no scheme in link and a port number at the end)
+	if u.Opaque != "" {
+		//fmt.Println("op", u.String())
+		act, err := url.Parse(actualURL)
+		if err != nil {
+			return actualURL
+		}
+		u, err = url.Parse(act.Scheme + "://" + u.String())
+		if err != nil {
+			return actualURL
+		}
+	}
+
 	var didHaveSlash bool
+
+	//determine if there was a slash at the end before cleaning
 	if len(u.Path) > 0 {
 		didHaveSlash = string(u.Path[len(u.Path)-1]) == "/"
+
+		//add a slash prefix before the path (to avoid constructions like 'scheme://host:portpath' sneaking in)
 		if string(u.Path[0]) != "/" {
 			u.Path = "/" + u.Path
 		}
 	}
 
+	//removes dots and whatnot where it can (so that we don't query for 'host/path/../path/../path/thing' etc)
 	cleaned := path.Clean(u.Path)
 
+	//check if the path starts with a / (to avoid that same issue as above with no leading /)
 	if string(cleaned[0]) != "/" {
 		cleaned = "/" + cleaned
 	}
-	if cleaned != "." {
+	//check if the cleaned path is just a single dot - if it's not then add the cleaned URL to the url base passed in
+	if cleaned != "." && cleaned != "/." {
 		actualURL += cleaned
 	}
 
-	if didHaveSlash && cleaned != "/" {
+	//check if it had a trailing slash before going in, and if it did, add it back
+	if didHaveSlash && !strings.HasSuffix(actualURL, "/") {
 		actualURL += "/"
 	}
 	return actualURL

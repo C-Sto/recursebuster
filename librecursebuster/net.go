@@ -132,6 +132,7 @@ func (gState *State) evaluateURL(method string, urlString string, client *http.C
 
 		//this is all we have to do if we aren't doing GET's
 		if gState.Cfg.NoGet {
+			success = true
 			if gState.Cfg.BurpMode { //send successful request again... twice as many requests, but less burp spam
 				gState.HTTPReq("HEAD", urlString, gState.BurpClient) //send a HEAD. Ignore body response
 			}
@@ -176,6 +177,7 @@ func (gState *State) evaluateURL(method string, urlString string, client *http.C
 	//check we care about it (body only) section
 	//double check that it's not 404/error using smart blockchain AI tech
 	is404, _ := detectSoft404(headResp, gState.Hosts.Get404(headResp.Request.Host), gState.Cfg.Ratio404)
+
 	if is404 {
 		//seems to be a soft 404 lol
 		return headResp, content, false

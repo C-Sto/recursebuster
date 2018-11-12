@@ -56,7 +56,7 @@ func TestBasicFunctionality(t *testing.T) {
 	//check for each specific line that should be in there..
 	tested := []string{}
 	ok200 := []string{
-		"/a", "/a/b", "/a/b/c", "/a/",
+		"/a", "/a/b", "/a/b/c", "/a/", "/spideronly",
 	}
 	for _, i := range ok200 {
 		tested = append(tested, i)
@@ -362,6 +362,61 @@ func TestHeaders(t *testing.T) {
 		t.Error("Failed Custom header check 2, found the path it shouldn't have")
 	}
 
+}
+
+func TestNoGET(t *testing.T) {
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.NoGet = true
+	gState, urlSlice := preSetupTest(cfg, "2014", finished, t)
+	gState.WordList = append(gState.WordList, "getonly")
+	gState.WordList = append(gState.WordList, "headonly")
+	found := postSetupTest(urlSlice, gState)
+	gState.Wait()
+
+	if x, ok := found["/headonly"]; !ok || x == nil {
+		t.Error("Failed check 1, didn't find a path it should have")
+	}
+
+	if x, ok := found["/getonly"]; ok && x != nil {
+		t.Error("Failed check 2, found the path it shouldn't have")
+	}
+}
+
+func TestNoHEAD(t *testing.T) {
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.NoHead = true
+	gState, urlSlice := preSetupTest(cfg, "2015", finished, t)
+	gState.WordList = append(gState.WordList, "getonly")
+	gState.WordList = append(gState.WordList, "headonly")
+	found := postSetupTest(urlSlice, gState)
+	gState.Wait()
+
+	if x, ok := found["/headonly"]; ok && x != nil {
+		t.Error("Failed check 2, found the path it shouldn't have")
+	}
+
+	if x, ok := found["/getonly"]; !ok || x == nil {
+		t.Error("Failed check 1, didn't find a path it should have")
+	}
+}
+
+func TestNoRecursion(t *testing.T) {
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.NoRecursion = true
+	gState, urlSlice := preSetupTest(cfg, "2016", finished, t)
+	found := postSetupTest(urlSlice, gState)
+	gState.Wait()
+
+	if x, ok := found["/a/b"]; ok && x != nil {
+		t.Error("Failed check 1, found a path it shouldn't have")
+	}
+	//todo: add more recursive things here to make sure it's not doing the thing
 }
 
 func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Response) {

@@ -49,7 +49,11 @@ y
 /c
 
 */
-
+const pre = `<!DOCTYPE html>
+<html>
+<body>`
+const post = `</body>
+</html>`
 const bod404 = `404 not found 20/20/19`
 const bod404mod = `404 not found 20/20/20`
 const bod200 = `200ish response! This should be different enough that it is not detected as being a soft 404, ideally anyway.`
@@ -70,6 +74,7 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 	ts.vMut.Unlock()
 
 	respCode := 404
+
 	switch strings.ToLower(r.URL.Path) {
 	case "/":
 		fallthrough
@@ -92,6 +97,8 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 	case "/appendslash/":
 		fallthrough
 	case "/badheader/":
+		fallthrough
+	case "/spideronly":
 		fallthrough
 	case "/a/y":
 		respCode = 200
@@ -185,6 +192,14 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 		respCode = 404
 	case "/canarysimilar":
 		respCode = 200
+	case "/getonly":
+		if r.Method == "GET" {
+			respCode = 200
+		}
+	case "/headonly":
+		if r.Method == "HEAD" {
+			respCode = 200
+		}
 	default:
 		respCode = 404
 	}
@@ -246,8 +261,8 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 	//}
 
 	w.WriteHeader(respCode)
-	fmt.Fprintln(w, bod)
-	//fmt.Println(r.Method, r.URL, respCode, bod)
+	fmt.Fprintln(w, pre+bod+" link: <a href=\""+r.Host+"/spideronly\">spider</a>"+post)
+	//link for basic spider test. Full spider testing (eg, collecting all link types) should be done in a unit test
 }
 
 type TestServer struct {
