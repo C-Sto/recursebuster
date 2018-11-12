@@ -134,6 +134,9 @@ func levenshteinDistance(s []byte, t []byte) int {
 //cleanURL will do some lexical cleaning of the URL - removing dots where relevant etc. Takes in the URL object contianing the path, and the base to append the path to
 func cleanURL(u *url.URL, actualURL string) string {
 
+	if u == nil {
+		return actualURL
+	}
 	//work out if the URL was parsed using an opaque thing (no slash after scheme - probably due to no scheme in link and a port number at the end)
 	if u.Opaque != "" {
 		//fmt.Println("op", u.String())

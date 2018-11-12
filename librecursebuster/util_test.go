@@ -3,6 +3,7 @@ package librecursebuster
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -37,6 +38,7 @@ The rawurl may be relative (a path, without a host) or absolute (starting with a
 func TestCleanURL(t *testing.T) {
 
 	cases := []string{ //all should resolve to a path of 'spider'
+		//normal relative/absolute paths
 		"/spider",
 		"http://localhost.com/spider",
 		"../spider",
@@ -45,27 +47,33 @@ func TestCleanURL(t *testing.T) {
 		"xx://localhost/spider",
 		"http://localhost///////////spider",
 		"https://localhost:2020/spider",
+		"://localhost/spider",
+		"//localhost/spider",
+		"http://localhost:/spider",
+		"://localhost/spider",
+		//janky paths that may include a hostname
+		//"localhost/spider", //This won't/shouldn't happen / It's kind of hard to think about what the fix for this would be without breaking stuff horribly
 	}
 
 	for _, x := range cases {
+		//use same method to get around the scheme bug
+		if strings.HasPrefix(x, "://") {
+			//add a grabage scheme to get past the url parse stuff (the scheme will be added from the reference anyway)
+			x = "xxx" + x
+		}
 		u, e := url.Parse(x)
 		if e != nil {
+			t.Fatal(e)
+		}
+		fmt.Println(x, "H->"+u.Host, "P->"+u.Path)
+		result, err := url.Parse((cleanURL(u, "http://localhost")))
+		if err != nil {
 			t.Error(e)
 		}
-		fmt.Println(cleanURL(u, "http://localhost"))
+		if result.Path != "/spider" {
+			t.Error("Parsed incorrectly: " + x + " -> " + result.Path)
+		}
 	}
-
-	u, e := url.Parse("localhost:2020/spider")
-	fmt.Println("Xx", "o"+u.Opaque, "p"+u.Path)
-
-	//u, e = url.Parse("http://localhost:2020/spider")
-	//fmt.Println("Xx", "o"+u.Opaque, "p"+u.Path)
-
-	fmt.Println(u, e)
-
-	fmt.Println(cleanURL(u, "http://localhost:2020"))
-
-	t.Error("aaa")
 }
 
 /*

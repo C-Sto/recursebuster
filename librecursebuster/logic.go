@@ -65,6 +65,11 @@ func (gState *State) ManageNewURLs() {
 			return
 		}
 		//check the candidate is an actual URL
+		//handle that one crazy case where :/ might be at the start because reasons
+		if strings.HasPrefix(candidate.URL, ":/") {
+			//add a grabage scheme to get past the url parse stuff
+			candidate.URL = "xxx" + candidate.URL
+		}
 		u, err := url.Parse(strings.TrimSpace(candidate.URL))
 
 		if err != nil {
@@ -74,7 +79,7 @@ func (gState *State) ManageNewURLs() {
 		}
 
 		//links of the form <a href="/thing" ></a> don't have a host portion to the URL
-		if len(u.Host) == 0 {
+		if u.Host == "" {
 			u.Host = candidate.Reference.Host
 		}
 
