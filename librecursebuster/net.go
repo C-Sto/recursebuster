@@ -31,14 +31,19 @@ func (gState *State) ConfigureHTTPClient(sendToBurpOnly bool) *http.Client {
 	//use a proxy if requested to
 	if (gState.Cfg.ProxyAddr != "" && !gState.Cfg.BurpMode) || //proxy is configured, and burpmode is disabled
 		(gState.Cfg.ProxyAddr != "" && gState.Cfg.BurpMode && sendToBurpOnly) { // proxy configured, in burpmode, and at the stage where we want to actually send it to burp
-		var proxyURL *url.URL
 		var err error
 		if strings.HasPrefix(gState.Cfg.ProxyAddr, "http") {
+			var proxyURL *url.URL
 			proxyURL, err = url.Parse(gState.Cfg.ProxyAddr)
 			if err != nil {
 				panic(err)
 			}
 			httpTransport.Proxy = http.ProxyURL(proxyURL)
+			//test proxy
+			_, err = net.Dial("tcp", proxyURL.Host)
+			if err != nil {
+				panic(err)
+			}
 
 		} else {
 
@@ -47,11 +52,11 @@ func (gState *State) ConfigureHTTPClient(sendToBurpOnly bool) *http.Client {
 				panic(err)
 			}
 			httpTransport.Dial = dialer.Dial
-		}
-		//test proxy
-		_, err = net.Dial("tcp", proxyURL.Host)
-		if err != nil {
-			panic(err)
+			//test proxy
+			_, err = net.Dial("tcp", gState.Cfg.ProxyAddr)
+			if err != nil {
+				panic(err)
+			}
 		}
 		if !sendToBurpOnly {
 			//send the set proxy status (don't need this for burp requests)
