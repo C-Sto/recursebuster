@@ -147,7 +147,15 @@ func (gState *State) evaluateURL(method string, urlString string, client *http.C
 	}
 
 	headResp, err := gState.HTTPReq(method, urlString, client)
-	content, _ = ioutil.ReadAll(headResp.Body)
+	if err != nil {
+		gState.PrintOutput(fmt.Sprintf("%s", err), Error, 0)
+		return headResp, content, false
+	}
+	content, err = ioutil.ReadAll(headResp.Body)
+	if err != nil {
+		gState.PrintOutput(fmt.Sprintf("%s", err), Error, 0)
+		return headResp, content, false
+	}
 	headResp.Body = ioutil.NopCloser(bytes.NewBuffer(content))
 	//<-gState.Chans.workersChan //done with the net thread
 	if err != nil {

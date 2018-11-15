@@ -153,9 +153,6 @@ func (gState *State) testURL(method string, urlString string, client *http.Clien
 	defer func() {
 		gState.wg.Done()
 		atomic.AddUint64(gState.TotalTested, 1)
-		if gState.DirbProgress != nil { //shoudl probably check if there is a wordlist, but this will do..
-			atomic.AddUint32(gState.DirbProgress, 1)
-		}
 	}()
 	select {
 	case gState.Chans.testChan <- method + ":" + urlString:
@@ -237,9 +234,9 @@ func (gState *State) dirBust(page SpiderPage) {
 	atomic.StoreUint32(gState.DirbProgress, 0)
 	//ensure we don't send things more than once
 	for _, word := range gState.WordList { //will receive from the channel until it's closed
+		atomic.AddUint32(gState.DirbProgress, 1)
 		//read words off the channel, and test it OR close out because we wanna skip it
 		if word == "" {
-			atomic.AddUint32(gState.DirbProgress, 1)
 			continue
 		}
 		select {
