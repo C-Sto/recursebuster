@@ -60,10 +60,7 @@ func (gState *State) ManageRequests() {
 func (gState *State) ManageNewURLs() {
 	//decides on whether to add to the directory list, or add to file output
 	for {
-		candidate, more := <-gState.Chans.newPagesChan
-		if !more {
-			return
-		}
+		candidate := <-gState.Chans.newPagesChan
 		//check the candidate is an actual URL
 		//handle that one crazy case where :/ might be at the start because reasons
 		if strings.HasPrefix(candidate.URL, "://") {
