@@ -252,14 +252,13 @@ func (gState *State) dirBust(page SpiderPage) {
 							gState.CMut.Unlock()
 							continue
 						}
+						gState.Checked[method+page.URL+word+"."+ext] = true
+						gState.CMut.Unlock()
 						gState.wg.Add(1)
 						gState.Chans.workersChan <- workUnit{
 							Method:    method,
 							URLString: page.URL + word + "." + ext,
 						}
-						//go gState.testURL(method, page.URL+word+"."+ext, gState.Client)
-						gState.Checked[method+page.URL+word+"."+ext] = true
-						gState.CMut.Unlock()
 					}
 				}
 				if gState.Cfg.AppendDir {
@@ -268,28 +267,26 @@ func (gState *State) dirBust(page SpiderPage) {
 						gState.CMut.Unlock()
 						continue
 					}
+					gState.Checked[method+page.URL+word+"/"] = true
+					gState.CMut.Unlock()
 					gState.wg.Add(1)
 					gState.Chans.workersChan <- workUnit{
 						Method:    method,
 						URLString: page.URL + word + "/",
 					}
-					//go gState.testURL(method, page.URL+word+"/", gState.Client)
-					gState.Checked[method+page.URL+word+"/"] = true
-					gState.CMut.Unlock()
 				}
 				gState.CMut.Lock()
 				if gState.Checked[method+page.URL+word] {
 					gState.CMut.Unlock()
 					continue
 				}
+				gState.Checked[method+page.URL+word] = true
+				gState.CMut.Unlock()
 				gState.wg.Add(1)
 				gState.Chans.workersChan <- workUnit{
 					Method:    method,
 					URLString: page.URL + word,
 				}
-				//go gState.testURL(method, page.URL+word, gState.Client)
-				gState.Checked[method+page.URL+word] = true
-				gState.CMut.Unlock()
 				//if gState.Cfg.MaxDirs == 1 {
 				//}
 			}
