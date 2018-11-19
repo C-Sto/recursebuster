@@ -74,48 +74,48 @@ func (s *State) StartUI(uiWG *sync.WaitGroup, quitChan chan struct{}) {
 	}
 }
 
-func (gState *State) addWorker(g *ui.Gui, v *ui.View) error {
-	atomic.AddUint32(gState.workerCount, 1)
-	go gState.testWorker()
+func (s *State) addWorker(g *ui.Gui, v *ui.View) error {
+	atomic.AddUint32(s.workerCount, 1)
+	go s.testWorker()
 	return nil
 }
 
-func (gState *State) stopWorker(g *ui.Gui, v *ui.View) error {
-	count := atomic.LoadUint32(gState.workerCount)
+func (s *State) stopWorker(g *ui.Gui, v *ui.View) error {
+	count := atomic.LoadUint32(s.workerCount)
 	if count == 0 { //avoid underflow
 		return nil
 	}
 	count = count - 1
-	atomic.StoreUint32(gState.workerCount, count)
-	gState.Chans.lessWorkersChan <- struct{}{}
+	atomic.StoreUint32(s.workerCount, count)
+	s.Chans.lessWorkersChan <- struct{}{}
 	return nil
 }
 
 //StopUI should be called when closing the program. It prints out the lines in the main view buffer to stdout, and closes the ui object
-func (gState *State) StopUI() {
-	p, _ := gState.ui.View("Main")
+func (s *State) StopUI() {
+	p, _ := s.ui.View("Main")
 	lines := p.ViewBuffer()
-	gState.ui.Close()
+	s.ui.Close()
 	fmt.Print(lines)
 }
 
-func (gState *State) handleX(g *ui.Gui, v *ui.View) error {
+func (s *State) handleX(g *ui.Gui, v *ui.View) error {
 	//vi, _ := g.View("Main")
-	//close(gState.StopDir)
+	//close(s.StopDir)
 	select { //lol dope hack to stop it blocking
-	case gState.StopDir <- struct{}{}:
+	case s.StopDir <- struct{}{}:
 	default:
 	}
-	//gState.StopDir <- struct{}{}
+	//s.StopDir <- struct{}{}
 	//fmt.Fprintln(v, "X!!!")
 	return nil
 }
 
-func (gState *State) quit(g *ui.Gui, v *ui.View) error {
+func (s *State) quit(g *ui.Gui, v *ui.View) error {
 	return ui.ErrQuit
 }
 
-func (gState *State) layout(g *ui.Gui) error {
+func (s *State) layout(g *ui.Gui) error {
 	mX, mY := g.Size()
 	v, err := g.SetView("Main", 0, 0, mX-1, mY-7)
 	if err != nil && err != ui.ErrUnknownView {
@@ -127,7 +127,7 @@ func (gState *State) layout(g *ui.Gui) error {
 		// Set autoscroll to normal again.
 		v.Autoscroll = true
 	}
-	v.Title = "~Recursebuster V" + gState.Version + " by C_Sto (@C__Sto)~"
+	v.Title = "~Recursebuster V" + s.Version + " by C_Sto (@C__Sto)~"
 	_, err = g.SetView("Status", 0, mY-6, mX-1, mY-1)
 	if err != nil && err != ui.ErrUnknownView {
 		return err

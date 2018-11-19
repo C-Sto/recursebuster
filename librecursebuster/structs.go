@@ -82,11 +82,11 @@ type OutLine struct {
 	Type    *ConsoleWriter
 }
 
-//var gState *State
+//var s *State
 
 //SetState will assign the global state object
-//func (gState *State) SetState(s *State) {
-//gState = s
+//func (s *State) SetState(s *State) {
+//s = s
 //}
 
 //Wait will wait until all the relevant waitgroups have completed
@@ -99,12 +99,12 @@ func (s *State) Wait() {
 		s.wg.Wait()
 	}
 	//close all the chans to avoid leaking routines during tests
-	//	close(gState.Chans.confirmedChan)
-	//	close(gState.Chans.newPagesChan)
-	//	close(gState.Chans.pagesChan)
-	//	close(gState.Chans.printChan)
-	//	close(gState.Chans.testChan)
-	//	close(gState.Chans.workersChan)
+	//	close(s.Chans.confirmedChan)
+	//	close(s.Chans.newPagesChan)
+	//	close(s.Chans.pagesChan)
+	//	close(s.Chans.printChan)
+	//	close(s.Chans.testChan)
+	//	close(s.Chans.workersChan)
 	//StopUI()
 }
 
@@ -331,80 +331,80 @@ type SpiderPage struct {
 }
 
 //SetupState will perform all the basic state setup functions (adding URL's to the blacklist etc)
-func (gState *State) SetupState() {
+func (s *State) SetupState() {
 
 	//set workers (whoops)
-	//gState.Chans.workersChan = make(chan struct{}, gState.Cfg.Threads)
+	//s.Chans.workersChan = make(chan struct{}, s.Cfg.Threads)
 
-	if gState.Cfg.Ajax {
-		gState.Cfg.Headers = append(gState.Cfg.Headers, "X-Requested-With:XMLHttpRequest")
+	if s.Cfg.Ajax {
+		s.Cfg.Headers = append(s.Cfg.Headers, "X-Requested-With:XMLHttpRequest")
 	}
 
-	for _, x := range strings.Split(gState.Cfg.Extensions, ",") {
-		gState.Extensions = append(gState.Extensions, x)
+	for _, x := range strings.Split(s.Cfg.Extensions, ",") {
+		s.Extensions = append(s.Extensions, x)
 	}
 
-	for _, x := range strings.Split(gState.Cfg.Methods, ",") {
-		gState.Methods = append(gState.Methods, x)
+	for _, x := range strings.Split(s.Cfg.Methods, ",") {
+		s.Methods = append(s.Methods, x)
 	}
 
-	for _, x := range strings.Split(gState.Cfg.BadResponses, ",") {
+	for _, x := range strings.Split(s.Cfg.BadResponses, ",") {
 		i, err := strconv.Atoi(x)
 		if err != nil {
 			fmt.Println("Bad error code supplied!")
 			panic(err)
 		}
-		gState.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
+		s.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
 	}
 
-	gState.Client = gState.ConfigureHTTPClient(false)
-	gState.BurpClient = gState.ConfigureHTTPClient(true)
+	s.Client = s.ConfigureHTTPClient(false)
+	s.BurpClient = s.ConfigureHTTPClient(true)
 
-	gState.Version = gState.Cfg.Version
+	s.Version = s.Cfg.Version
 
-	if gState.Cfg.BlacklistLocation != "" {
+	if s.Cfg.BlacklistLocation != "" {
 		readerChan := make(chan string, 100)
-		go LoadWords(gState.Cfg.BlacklistLocation, readerChan)
+		go LoadWords(s.Cfg.BlacklistLocation, readerChan)
 		for x := range readerChan {
-			gState.Blacklist[x] = true
+			s.Blacklist[x] = true
 		}
 	}
 
-	if gState.Cfg.BodyContent != "" {
+	if s.Cfg.BodyContent != "" {
 		readerChan := make(chan string, 100)
-		go LoadWords(gState.Cfg.BodyContent, readerChan)
+		go LoadWords(s.Cfg.BodyContent, readerChan)
 		lines := []string{}
 		for x := range readerChan {
 			lines = append(lines, x)
 		}
-		gState.bodyContent = strings.Join(lines, "\n")
+		s.bodyContent = strings.Join(lines, "\n")
 	}
 
-	if gState.Cfg.WhitelistLocation != "" {
+	if s.Cfg.WhitelistLocation != "" {
 		readerChan := make(chan string, 100)
-		go LoadWords(gState.Cfg.WhitelistLocation, readerChan)
+		go LoadWords(s.Cfg.WhitelistLocation, readerChan)
 		for x := range readerChan {
-			gState.Whitelist[x] = true
+			s.Whitelist[x] = true
 		}
 	}
 
-	if gState.Cfg.Wordlist != "" { // && gState.Cfg.MaxDirs == 1 {
+	if s.Cfg.Wordlist != "" { // && s.Cfg.MaxDirs == 1 {
 
 		zerod := uint32(0)
-		gState.DirbProgress = &zerod
+		s.DirbProgress = &zerod
 
 		readerChan := make(chan string, 100)
-		go LoadWords(gState.Cfg.Wordlist, readerChan)
+		go LoadWords(s.Cfg.Wordlist, readerChan)
 		for v := range readerChan {
-			gState.WordList = append(gState.WordList, v)
-			//atomic.AddUint32(gState.WordlistLen, 1)
+			s.WordList = append(s.WordList, v)
+			//atomic.AddUint32(s.WordlistLen, 1)
 		}
 	}
-	workers := uint32(gState.Cfg.Threads)
-	gState.workerCount = &workers
-	gState.StartTime = time.Now()
-	gState.PerSecondShort = new(uint64)
-	gState.PerSecondLong = new(uint64)
+	workers := uint32(s.Cfg.Threads)
+	s.workerCount = &workers
+	s.StartTime = time.Now()
+	s.PerSecondShort = new(uint64)
+	s.PerSecondLong = new(uint64)
 
 }
 func getURLSlice(globalState *State) []string {

@@ -277,6 +277,7 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 	//link for basic spider test. Full spider testing (eg, collecting all link types) should be done in a unit test
 }
 
+//TestServer is a webserver instance that facilitates functional testing of code that requires the ability to send web requests
 type TestServer struct {
 	tes     *testing.T
 	visited map[string]bool
