@@ -40,11 +40,9 @@ func (gState *State) ManageRequests() {
 		for _, method := range gState.Methods {
 			if page.Result == nil && !gState.Cfg.NoBase {
 				gState.wg.Add(1)
-				//go gState.testURL(method, page.URL, gState.Client)
 				gState.Chans.workersChan <- workUnit{
 					Method:    method,
 					URLString: page.URL,
-					//Client:    gState.Client,
 				}
 			}
 			if gState.Cfg.Wordlist != "" && string(page.URL[len(page.URL)-1]) == "/" { //if we are testing a directory
@@ -155,7 +153,6 @@ func (gState *State) testURL(method string, urlString string, client *http.Clien
 	case gState.Chans.testChan <- method + ":" + urlString:
 	default: //this is to prevent blocking, it doesn't _really_ matter if it doesn't get written to output
 	}
-	//gState.Chans.workersChan <- struct{}{}
 	headResp, content, good := gState.evaluateURL(method, urlString, client)
 
 	if !good && !gState.Cfg.ShowAll {

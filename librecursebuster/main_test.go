@@ -55,37 +55,13 @@ func TestBasicFunctionality(t *testing.T) {
 
 	//check for each specific line that should be in there..
 	tested := []string{}
-	ok200 := []string{
+	ok := []string{
 		"/a", "/a/b", "/a/b/c", "/a/", "/spideronly",
-	}
-	for _, i := range ok200 {
-		tested = append(tested, i)
-		if x, ok := found[i]; !ok || x == nil {
-			t.Error("Did not find " + i)
-		}
-	}
-	ok300 := []string{
 		"/b", "/b/c",
-	}
-	for _, i := range ok300 {
-		tested = append(tested, i)
-		if x, ok := found[i]; !ok || x == nil {
-			t.Error("Did not find " + i)
-		}
-	}
-	ok400 := []string{
 		"/a/b/c/", "/a/b/c/d",
-	}
-	for _, i := range ok400 {
-		tested = append(tested, i)
-		if x, ok := found[i]; !ok || x == nil {
-			t.Error("Did not find " + i)
-		}
-	}
-	ok500 := []string{
 		"/c/d", "/c", "/c/",
 	}
-	for _, i := range ok500 {
+	for _, i := range ok {
 		tested = append(tested, i)
 		if x, ok := found[i]; !ok || x == nil {
 			t.Error("Did not find " + i)
@@ -577,47 +553,46 @@ z
 
 func getDefaultConfig() *Config {
 	return &Config{
-		Version:      "TEST",
-		ShowAll:      false,
-		AppendDir:    true,
-		Auth:         "",
-		BadResponses: "404",
-		BadHeader:    nil, //ArrayStringFlag{} // "" // "Check for presence of this header. If an exact match is found"
-		//BodyContent, ""
+		Version: "TEST",
+		ShowAll: false,
+
+		Agent:             "RecurseBuster/" + "TESTING",
+		AppendDir:         true,
+		Auth:              "",
+		BadHeader:         nil, //ArrayStringFlag{} // "" // "Check for presence of this header. If an exact match is found"
+		BadResponses:      "404",
 		BlacklistLocation: "",
+		BurpMode:          false,
 		Canary:            "",
 		CleanOutput:       false,
 		Cookies:           "",
 		Debug:             false,
-		//MaxDirs: 1
 		Extensions:        "",
+		FollowRedirects:   false,
 		Headers:           nil, // "Additional headers to include with request. Supply as key:value. Can specify multiple - eg '-headers X-Forwarded-For:127.0.01 -headers X-ATT-DeviceId:XXXXX'")
 		HTTPS:             false,
 		InputList:         "",
-		SSLIgnore:         false,
-		ShowLen:           false,
+		Localpath:         "." + string(os.PathSeparator) + "busted.txt",
+		Methods:           "GET",
 		NoBase:            false,
 		NoGet:             false,
 		NoHead:            false,
 		NoRecursion:       false,
 		NoSpider:          false,
-		NoStatus:          false,
 		NoStartStop:       false,
-		NoWildcardChecks:  false,
+		NoStatus:          false,
 		NoUI:              true,
-		Localpath:         "." + string(os.PathSeparator) + "busted.txt",
-		Methods:           "GET",
+		NoWildcardChecks:  false,
 		ProxyAddr:         "",
 		Ratio404:          0.95,
-		FollowRedirects:   false,
-		BurpMode:          false,
+		ShowLen:           false,
+		ShowVersion:       false,
+		SSLIgnore:         false,
 		Threads:           1,
 		Timeout:           20,
-		Agent:             "RecurseBuster/" + "TESTING",
 		VerboseLevel:      0,
-		ShowVersion:       false,
-		Wordlist:          "",
 		WhitelistLocation: "",
+		Wordlist:          "",
 
 		URL: localURL,
 	}
