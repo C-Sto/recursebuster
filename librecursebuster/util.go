@@ -131,7 +131,7 @@ func levenshteinDistance(s []byte, t []byte) int {
 	return v1[len(t)]
 }
 
-//cleanURL will do some lexical cleaning of the URL - removing dots where relevant etc. Takes in the URL object contianing the path, and the base to append the path to
+//cleanURL will do some lexical cleaning of the URL - removing dots where relevant etc. Takes in the URL object containing the path, and the base to append the path to
 func cleanURL(u *url.URL, actualURL string) string {
 
 	if u == nil {

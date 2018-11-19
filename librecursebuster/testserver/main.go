@@ -57,7 +57,7 @@ const post = `</body>
 const bod404 = `404 not found 20/20/19`
 const bod404mod = `404 not found 20/20/20`
 const bod200 = `200ish response! This should be different enough that it is not detected as being a soft 404, ideally anyway.`
-const bodNeither = `Totally different response indicating soemthing interesting, but probably not a 404`
+const bodNeither = `Totally different response indicating something interesting, but probably not a 404`
 const bodCanary1 = `Definitely a Canary response, should be sent with 404 for the canary value`
 const bodCanary2 = `similar to a Canary response, should be sent with 200 for the canary value`
 

@@ -58,7 +58,7 @@ func TestCleanURL(t *testing.T) {
 	for _, x := range cases {
 		//use same method to get around the scheme bug
 		if strings.HasPrefix(x, "://") {
-			//add a grabage scheme to get past the url parse stuff (the scheme will be added from the reference anyway)
+			//add a garbage scheme to get past the url parse stuff (the scheme will be added from the reference anyway)
 			x = "xxx" + x
 		}
 		u, e := url.Parse(x)

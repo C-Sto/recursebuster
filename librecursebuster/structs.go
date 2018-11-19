@@ -158,7 +158,7 @@ type State struct {
 	WordList     []string
 	DirbProgress *uint32
 
-	StopDir chan struct{} //should probably have all teh chans in here
+	StopDir chan struct{} //should probably have all the chans in here
 
 	Checked map[string]bool
 	CMut    *sync.RWMutex

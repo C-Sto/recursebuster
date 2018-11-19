@@ -64,7 +64,7 @@ func (gState *State) ManageNewURLs() {
 		//check the candidate is an actual URL
 		//handle that one crazy case where :/ might be at the start because reasons
 		if strings.HasPrefix(candidate.URL, "://") {
-			//add a grabage scheme to get past the url parse stuff (the scheme will be added from the reference anyway)
+			//add a garbage scheme to get past the url parse stuff (the scheme will be added from the reference anyway)
 			candidate.URL = "xxx" + candidate.URL
 		}
 		u, err := url.Parse(strings.TrimSpace(candidate.URL))
