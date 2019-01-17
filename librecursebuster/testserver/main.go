@@ -61,6 +61,14 @@ const bodNeither = `Totally different response indicating something interesting,
 const bodCanary1 = `Definitely a Canary response, should be sent with 404 for the canary value`
 const bodCanary2 = `similar to a Canary response, should be sent with 200 for the canary value`
 
+const robotsBod = `
+User-agent: Googlebot 
+Disallow: /robotsfolder/
+Disallow: /cgi-bin/
+Disallow: /tmp/
+Disallow: /junk/
+`
+
 func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 
 	ts.vMut.Lock()
@@ -74,6 +82,7 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 	ts.vMut.Unlock()
 
 	respCode := 404
+	bod := bodNeither
 
 	switch strings.ToLower(r.URL.Path) {
 	case "/":
@@ -99,6 +108,12 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 	case "/badheader/":
 		fallthrough
 	case "/spideronly":
+		fallthrough
+	case "/robotsfolder/a":
+		fallthrough
+	case "/robotsfolder/b":
+		fallthrough
+	case "/junk/a":
 		fallthrough
 	case "/a/y":
 		respCode = 200
@@ -212,57 +227,65 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "HEAD" {
 			respCode = 200
 		}
+	case "/robots.txt":
+		if r.Method == "GET" {
+			respCode = 200
+			bod = robotsBod
+		}
+	case "/robotsfolder/x":
+
 	default:
 		respCode = 404
 	}
 
-	bod := bodNeither
-	if respCode == 200 {
-		bod = bod200
-	}
-	if strings.HasSuffix(r.URL.Path, "/x") { // strings.ToLower(string(r.URL.Path[len(r.URL.Path)-1])) == "x" {
-		//404 body
-		bod = bod404
-	}
-	if strings.HasSuffix(r.URL.Path, "/y") {
-		//modified 404
-		bod = bod404mod
-	}
-
-	if respCode == 404 {
-		bod = bod404
-	}
-
-	if r.URL.Path == "/canarystringvalue" {
-		bod = bodCanary1
-	}
-
-	if r.URL.Path == "/canarysimilar" {
-		bod = bodCanary2
-	}
-
-	if respCode == 401 {
-		if u, p, ok := r.BasicAuth(); strings.ToLower(string(r.URL.Path[len(r.URL.Path)-1])) == "basicauth" &&
-			ok && u == "test" && p == "test" {
-			respCode = 200
+	if bod == bodNeither {
+		if respCode == 200 {
 			bod = bod200
 		}
-	}
-
-	if respCode == 302 || respCode == 301 {
-		if strings.ToLower(r.URL.Path) == "/b" {
-			w.Header().Set("Location", "/r/")
-		} else if strings.ToLower(r.URL.Path) == "/b/c" {
-			w.Header().Set("Location", "/r/b")
-		} else if strings.ToLower(r.URL.Path) == "/b/c/" {
-			w.Header().Set("Location", "/r/b/c")
-		} else if strings.ToLower(r.URL.Path) == "/b/x" {
-			w.Header().Set("Location", "/r/x")
-		} else if strings.ToLower(r.URL.Path) == "/b/y" {
-			w.Header().Set("Location", "/r/y")
+		if strings.HasSuffix(r.URL.Path, "/x") { // strings.ToLower(string(r.URL.Path[len(r.URL.Path)-1])) == "x" {
+			//404 body
+			bod = bod404
+		}
+		if strings.HasSuffix(r.URL.Path, "/y") {
+			//modified 404
+			bod = bod404mod
 		}
 
-		bod = ""
+		if respCode == 404 {
+			bod = bod404
+		}
+
+		if r.URL.Path == "/canarystringvalue" {
+			bod = bodCanary1
+		}
+
+		if r.URL.Path == "/canarysimilar" {
+			bod = bodCanary2
+		}
+
+		if respCode == 401 {
+			if u, p, ok := r.BasicAuth(); strings.ToLower(string(r.URL.Path[len(r.URL.Path)-1])) == "basicauth" &&
+				ok && u == "test" && p == "test" {
+				respCode = 200
+				bod = bod200
+			}
+		}
+
+		if respCode == 302 || respCode == 301 {
+			if strings.ToLower(r.URL.Path) == "/b" {
+				w.Header().Set("Location", "/r/")
+			} else if strings.ToLower(r.URL.Path) == "/b/c" {
+				w.Header().Set("Location", "/r/b")
+			} else if strings.ToLower(r.URL.Path) == "/b/c/" {
+				w.Header().Set("Location", "/r/b/c")
+			} else if strings.ToLower(r.URL.Path) == "/b/x" {
+				w.Header().Set("Location", "/r/x")
+			} else if strings.ToLower(r.URL.Path) == "/b/y" {
+				w.Header().Set("Location", "/r/y")
+			}
+
+			bod = ""
+		}
 	}
 	if strings.ToLower(r.URL.Path) == "/badheader/" {
 		w.Header().Add("X-Bad-Header", "test123")

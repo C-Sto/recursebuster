@@ -241,57 +241,61 @@ func (gState *State) dirBust(page SpiderPage) {
 			}
 			return
 		default:
-			for _, method := range gState.Methods {
-				if len(gState.Extensions) > 0 && gState.Extensions[0] != "" {
-					for _, ext := range gState.Extensions {
-						gState.CMut.Lock()
-						if gState.Checked[method+page.URL+word+"."+ext] {
-							gState.CMut.Unlock()
-							continue
-						}
-						gState.Checked[method+page.URL+word+"."+ext] = true
-						gState.CMut.Unlock()
-						gState.wg.Add(1)
-						gState.Chans.workersChan <- workUnit{
-							Method:    method,
-							URLString: page.URL + word + "." + ext,
-						}
-					}
-				}
-				if gState.Cfg.AppendDir {
-					gState.CMut.Lock()
-					if gState.Checked[method+page.URL+word+"/"] {
-						gState.CMut.Unlock()
-						continue
-					}
-					gState.Checked[method+page.URL+word+"/"] = true
-					gState.CMut.Unlock()
-					gState.wg.Add(1)
-					gState.Chans.workersChan <- workUnit{
-						Method:    method,
-						URLString: page.URL + word + "/",
-					}
-				}
-				gState.CMut.Lock()
-				if gState.Checked[method+page.URL+word] {
-					gState.CMut.Unlock()
-					continue
-				}
-				gState.Checked[method+page.URL+word] = true
-				gState.CMut.Unlock()
-				gState.wg.Add(1)
-				gState.Chans.workersChan <- workUnit{
-					Method:    method,
-					URLString: page.URL + word,
-				}
-				//if gState.Cfg.MaxDirs == 1 {
-				//}
-			}
+			gState.combinate(page, word)
 		}
 	}
 	//<-maxDirs
 	if !gState.Cfg.NoStartStop {
 		gState.PrintOutput(fmt.Sprintf("Finished dirbusting: %s", page.URL), Info, 0)
+	}
+}
+
+func (gState *State) combinate(page SpiderPage, word string) {
+	for _, method := range gState.Methods {
+		if len(gState.Extensions) > 0 && gState.Extensions[0] != "" {
+			for _, ext := range gState.Extensions {
+				gState.CMut.Lock()
+				if gState.Checked[method+page.URL+word+"."+ext] {
+					gState.CMut.Unlock()
+					continue
+				}
+				gState.Checked[method+page.URL+word+"."+ext] = true
+				gState.CMut.Unlock()
+				gState.wg.Add(1)
+				gState.Chans.workersChan <- workUnit{
+					Method:    method,
+					URLString: page.URL + word + "." + ext,
+				}
+			}
+		}
+		if gState.Cfg.AppendDir {
+			gState.CMut.Lock()
+			if gState.Checked[method+page.URL+word+"/"] {
+				gState.CMut.Unlock()
+				continue
+			}
+			gState.Checked[method+page.URL+word+"/"] = true
+			gState.CMut.Unlock()
+			gState.wg.Add(1)
+			gState.Chans.workersChan <- workUnit{
+				Method:    method,
+				URLString: page.URL + word + "/",
+			}
+		}
+		gState.CMut.Lock()
+		if gState.Checked[method+page.URL+word] {
+			gState.CMut.Unlock()
+			continue
+		}
+		gState.Checked[method+page.URL+word] = true
+		gState.CMut.Unlock()
+		gState.wg.Add(1)
+		gState.Chans.workersChan <- workUnit{
+			Method:    method,
+			URLString: page.URL + word,
+		}
+		//if gState.Cfg.MaxDirs == 1 {
+		//}
 	}
 }
 
@@ -310,8 +314,8 @@ func (gState *State) StartBusting(randURL string, u url.URL) {
 				)
 				return
 			}
-			panic("Canary Error, check url is correct: " + randURL + "\n" + err.Error())
-
+			gState.PrintOutput("Canary Error, check url is correct: "+randURL+"\n"+err.Error(), Error, 1)
+			return
 		}
 		gState.PrintOutput(
 			fmt.Sprintf("Canary sent: %s, Response: %v", randURL, resp.Status),
@@ -343,5 +347,77 @@ func (gState *State) StartBusting(randURL string, u url.URL) {
 		gState.Chans.pagesChan <- x
 		gState.Checked[x.URL] = true
 		gState.PrintOutput("URL Added: "+x.URL, Debug, 3)
+	}
+	//got this far, check for robots and add that too
+	if !gState.Cfg.NoRobots {
+		gState.getRobots(u)
+	}
+}
+
+func (gState *State) getRobots(u url.URL) {
+	//make url good
+	robotsUrl := u.String()
+	if !strings.HasSuffix(robotsUrl, "/") {
+		robotsUrl = robotsUrl + "/"
+	}
+	robotsUrl = robotsUrl + "robots.txt"
+	resp, err := gState.HTTPReq("GET", robotsUrl, gState.Client)
+	//<-gState.Chans.workersChan
+	if err != nil {
+		if gState.Cfg.InputList != "" {
+			gState.PrintOutput(
+				err.Error(),
+				Error,
+				0,
+			)
+			return
+		}
+		gState.PrintOutput("Robots Error, check url is correct: "+robotsUrl+"\n"+err.Error(), Error, 1)
+		return
+	}
+	gState.PrintOutput(
+		fmt.Sprintf("Robots retreived: %s, Response: %v", robotsUrl, resp.Status),
+		Debug, 2,
+	)
+	//https://github.com/samclarke/robotstxt/blob/master/robotstxt.go thx samclarke
+	content, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		gState.PrintOutput("Robots Error: \n"+err.Error(), Error, 1)
+		return
+	}
+	//parse robots.txt
+	contents := strings.Split(string(content), "\n")
+	for _, line := range contents {
+		//split into parts
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) > 1 {
+			rule, val := strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+			switch strings.ToLower(rule) {
+			case "user-agent":
+				fallthrough
+			case "crawl-delay":
+				fallthrough
+			case "host":
+				//don't care
+			case "sitemap":
+				//don't care at the moment, this seems a logical thing to parse and add to the search though
+			default:
+				//everything else
+				if val != "" {
+
+					x := SpiderPage{}
+					x.Reference = &u
+					x.URL = u.String()
+
+					if !strings.HasSuffix(x.URL, "/") && !strings.HasPrefix(val, "/") {
+						x.URL = x.URL + "/"
+					}
+					x.URL = x.URL + val
+					gState.wg.Add(1)
+					gState.Chans.newPagesChan <- x
+
+				}
+			}
+		}
 	}
 }

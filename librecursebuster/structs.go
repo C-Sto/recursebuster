@@ -285,6 +285,7 @@ type Config struct {
 	NoGet             bool
 	NoHead            bool
 	NoRecursion       bool
+	NoRobots          bool
 	NoSpider          bool
 	NoStatus          bool
 	NoStartStop       bool

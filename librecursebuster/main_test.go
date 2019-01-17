@@ -449,6 +449,29 @@ func TestMethods(t *testing.T) {
 	}
 }
 
+func TestRobots(t *testing.T) {
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	gState, urlSlice := preSetupTest(cfg, "2020", finished, t)
+	found := postSetupTest(urlSlice, gState)
+	gState.Wait()
+
+	//should find
+	if x, ok := found["/robotsfolder/a"]; !ok || x == nil {
+		t.Error("Failed check 1, didn't find a path it should have")
+	}
+
+	if x, ok := found["/junk/a"]; !ok || x == nil {
+		t.Error("Failed check 2, didn't find a path it should have")
+	}
+
+	if x, ok := found["/robotsfolder/b"]; !ok || x == nil {
+		t.Error("Failed check 3, didn't find a path it should have")
+	}
+
+}
+
 func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Response) {
 	//start up the management goroutines
 	go gState.ManageRequests()
