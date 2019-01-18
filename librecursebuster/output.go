@@ -62,8 +62,11 @@ func (gState *State) OutputWriter(localPath string) {
 		page := object.URL
 		if _, ok := pages[page]; !ok {
 			pages[page] = true
-			writeS := fmt.Sprintf(stringToWrite, object.Result.Request.Method, page, object.Result.Status)
-			printS := fmt.Sprintf(stringToPrint, object.Result.Request.Method, page, object.Result.Status)
+			writeS := " "
+			printS := " "
+			if (object.Result!=nil) {
+				writeS = fmt.Sprintf(stringToWrite, object.Result.Request.Method, page, object.Result.Status)
+				printS = fmt.Sprintf(stringToPrint, object.Result.Request.Method, page, object.Result.Status)
 			if gState.Cfg.ShowLen {
 				writeS = fmt.Sprintf(stringToWrite, object.Result.Request.Method, page, object.Result.Status, object.Result.ContentLength)
 				printS = fmt.Sprintf(stringToPrint, object.Result.Request.Method, page, object.Result.Status, object.Result.ContentLength)
@@ -80,6 +83,7 @@ func (gState *State) OutputWriter(localPath string) {
 			file.Sync()
 
 			gState.printBasedOnStatus(object.Result.StatusCode, printS)
+			}
 		}
 		gState.wg.Done()
 		//wg.Done()
