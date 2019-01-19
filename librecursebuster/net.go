@@ -129,10 +129,18 @@ func (gState *State) evaluateURL(method string, urlString string, client *http.C
 		}
 
 		//Check if we care about it (header only) section
-		if gState.BadResponses[headResp.StatusCode] {
-			success = false
-			//<-gState.Chans.workersChan
-			return headResp, content, success
+		if len(gState.GoodResponses) > 0 {
+			if v, ok := gState.GoodResponses[headResp.StatusCode]; !ok || !v {
+				success = false
+				//<-gState.Chans.workersChan
+				return headResp, content, success
+			}
+		} else {
+			if gState.BadResponses[headResp.StatusCode] {
+				success = false
+				//<-gState.Chans.workersChan
+				return headResp, content, success
+			}
 		}
 
 		//this is all we have to do if we aren't doing GET's
@@ -166,9 +174,17 @@ func (gState *State) evaluateURL(method string, urlString string, client *http.C
 	}
 
 	//Check if we care about it (response code only) section
-	if gState.BadResponses[headResp.StatusCode] {
-		success = false
-		return headResp, content, success
+	if len(gState.GoodResponses) > 0 {
+		if v, ok := gState.GoodResponses[headResp.StatusCode]; !ok || !v {
+			success = false
+			//<-gState.Chans.workersChan
+			return headResp, content, success
+		}
+	} else {
+		if gState.BadResponses[headResp.StatusCode] {
+			success = false
+			return headResp, content, success
+		}
 	}
 
 	//check for bad headers in the response

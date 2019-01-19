@@ -152,6 +152,7 @@ type State struct {
 	Blacklist      map[string]bool
 	Whitelist      map[string]bool
 	BadResponses   map[int]bool //response codes to consider *dont care* (this might be worth putting in per host state, but idk how)
+	GoodResponses  map[int]bool //response codes to consider *only care*
 	Extensions     []string
 	Methods        []string
 	//	WordlistLen    *uint32
@@ -186,6 +187,7 @@ func (s *State) AddWG() {
 func (State) Init() *State {
 	s := &State{
 		BadResponses:   make(map[int]bool),
+		GoodResponses:  make(map[int]bool),
 		Whitelist:      make(map[string]bool),
 		Blacklist:      make(map[string]bool),
 		StopDir:        make(chan struct{}, 1),
@@ -265,6 +267,7 @@ type Config struct {
 	AppendDir         bool
 	Auth              string
 	BadResponses      string
+	GoodResponses     string
 	BadHeader         ArrayStringFlag
 	BodyContent       string
 	BlacklistLocation string
@@ -353,10 +356,22 @@ func (s *State) SetupState() {
 	for _, x := range strings.Split(s.Cfg.BadResponses, ",") {
 		i, err := strconv.Atoi(x)
 		if err != nil {
-			fmt.Println("Bad error code supplied!")
+			fmt.Println("Bad response code supplied!")
 			panic(err)
 		}
 		s.BadResponses[i] = true //this is probably a candidate for individual urls. Unsure how to config that cleanly though
+	}
+
+	for _, x := range strings.Split(s.Cfg.GoodResponses, ",") {
+		if x == "" {
+			continue
+		}
+		i, err := strconv.Atoi(x)
+		if err != nil {
+			fmt.Println("Bad response code supplied!")
+			panic(err)
+		}
+		s.GoodResponses[i] = true
 	}
 
 	s.Client = s.ConfigureHTTPClient(false)

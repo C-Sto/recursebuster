@@ -476,7 +476,7 @@ func TestWeirdWords(t *testing.T) {
 	t.Parallel()
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
-	gState, urlSlice := preSetupTest(cfg, "2020", finished, t)
+	gState, urlSlice := preSetupTest(cfg, "2021", finished, t)
 	//add some woderful and weird things to the wordlist
 	for i := 0; i < 256; i++ {
 		gState.WordList = append(gState.WordList, "te"+string(i)+"st")
@@ -500,6 +500,51 @@ func TestWeirdWords(t *testing.T) {
 			t.Error("Did not find " + i)
 		}
 	}
+}
+
+func TestGoodCodes(t *testing.T) {
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.GoodResponses = "500"
+	gState, urlSlice := preSetupTest(cfg, "2022", finished, t)
+	found := postSetupTest(urlSlice, gState)
+	gState.Wait()
+
+	tested := []string{}
+	ok := []string{
+		"/c", "/c/",
+	}
+	for _, i := range ok {
+		tested = append(tested, i)
+		if x, ok := found[i]; !ok || x == nil {
+			t.Error("Did not find " + i)
+		}
+	}
+
+	//check for values that should not have been found
+	for k := range found {
+		if strings.Contains(k, "z") {
+			t.Error("Found (but should not have) " + k)
+		}
+	}
+
+	if x, ok := found["/a/x"]; ok && x != nil {
+		t.Error("Found (but should not have) /a/x")
+	}
+
+	if x, ok := found["/a"]; ok && x != nil {
+		t.Error("Found (but should not have) /a")
+	}
+
+	if x, ok := found["/a/b"]; ok && x != nil {
+		t.Error("Found (but should not have) /a/b")
+	}
+
+	if x, ok := found["/b/y"]; ok && x != nil {
+		t.Error("Found (but should not have) /b/y")
+	}
+
 }
 
 func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Response) {
