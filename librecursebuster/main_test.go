@@ -472,6 +472,36 @@ func TestRobots(t *testing.T) {
 
 }
 
+func TestWeirdWords(t *testing.T) {
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	gState, urlSlice := preSetupTest(cfg, "2020", finished, t)
+	//add some woderful and weird things to the wordlist
+	for i := 0; i < 256; i++ {
+		gState.WordList = append(gState.WordList, "te"+string(i)+"st")
+		//string(i)
+	}
+	found := postSetupTest(urlSlice, gState)
+	gState.Wait()
+
+	//same as the regular test
+	//check for each specific line that should be in there..
+	tested := []string{}
+	ok := []string{
+		"/a", "/a/b", "/a/b/c", "/a/", "/spideronly",
+		"/b", "/b/c",
+		"/a/b/c/", "/a/b/c/d",
+		"/c/d", "/c", "/c/",
+	}
+	for _, i := range ok {
+		tested = append(tested, i)
+		if x, ok := found[i]; !ok || x == nil {
+			t.Error("Did not find " + i)
+		}
+	}
+}
+
 func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Response) {
 	//start up the management goroutines
 	go gState.ManageRequests()

@@ -283,6 +283,7 @@ type Config struct {
 	Methods           string
 	NoBase            bool
 	NoGet             bool
+	NoEncode          bool
 	NoHead            bool
 	NoRecursion       bool
 	NoRobots          bool

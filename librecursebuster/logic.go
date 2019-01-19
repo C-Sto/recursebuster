@@ -228,6 +228,9 @@ func (gState *State) dirBust(page SpiderPage) {
 	atomic.StoreUint32(gState.DirbProgress, 0)
 	//ensure we don't send things more than once
 	for _, word := range gState.WordList { //will receive from the channel until it's closed
+		if !gState.Cfg.NoEncode {
+			word = url.PathEscape(word)
+		}
 		atomic.AddUint32(gState.DirbProgress, 1)
 		//read words off the channel, and test it OR close out because we wanna skip it
 		if word == "" {
