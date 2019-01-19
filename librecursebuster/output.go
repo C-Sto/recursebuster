@@ -62,6 +62,9 @@ func (gState *State) OutputWriter(localPath string) {
 		page := object.URL
 		if _, ok := pages[page]; !ok {
 			pages[page] = true
+			if object.Result == nil {
+				continue
+			}
 			writeS := fmt.Sprintf(stringToWrite, object.Result.Request.Method, page, object.Result.Status)
 			printS := fmt.Sprintf(stringToPrint, object.Result.Request.Method, page, object.Result.Status)
 			if gState.Cfg.ShowLen {
