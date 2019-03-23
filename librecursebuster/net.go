@@ -15,8 +15,12 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+type httpBoi interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
 //ConfigureHTTPClient configures and returns a HTTP Client (mostly useful to be able to send to burp)
-func (gState *State) ConfigureHTTPClient(sendToBurpOnly bool) *http.Client {
+func (gState *State) ConfigureHTTPClient(sendToBurpOnly bool) httpBoi {
 
 	httpTransport := &http.Transport{MaxIdleConns: 100}
 	client := &http.Client{Transport: httpTransport, Timeout: time.Duration(gState.Cfg.Timeout) * time.Second}
@@ -69,7 +73,7 @@ func (gState *State) ConfigureHTTPClient(sendToBurpOnly bool) *http.Client {
 
 //HTTPReq sends the HTTP request based on the given settings, returns the response and the body
 //todo: This can probably be optimized to exit once the head has been retreived and discard the body
-func (gState *State) HTTPReq(method, path string, client *http.Client) (resp *http.Response, err error) {
+func (gState *State) HTTPReq(method, path string, client httpBoi /*http.Client*/) (resp *http.Response, err error) {
 
 	if gState.Blacklist[path] {
 		return nil, errors.New("Blacklisted URL: " + path)
@@ -116,7 +120,7 @@ func (gState *State) HTTPReq(method, path string, client *http.Client) (resp *ht
 	return resp, err
 }
 
-func (gState *State) evaluateURL(method string, urlString string, client *http.Client) (headResp *http.Response, content []byte, success bool) {
+func (gState *State) evaluateURL(method string, urlString string, client httpBoi /*http.Client*/) (headResp *http.Response, content []byte, success bool) {
 
 	//optimize GET requests by sending a head first (it's cheaper)
 	if method == "GET" && !gState.Cfg.NoHead {

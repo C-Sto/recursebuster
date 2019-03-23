@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 	"strings"
 	"sync/atomic"
@@ -144,7 +143,7 @@ func (gState *State) testWorker() {
 	}
 }
 
-func (gState *State) testURL(method string, urlString string, client *http.Client) {
+func (gState *State) testURL(method string, urlString string, client httpBoi /*http.Client*/) {
 	defer func() {
 		gState.wg.Done()
 		atomic.AddUint64(gState.TotalTested, 1)

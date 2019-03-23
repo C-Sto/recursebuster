@@ -14,7 +14,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.6.9"
+const version = "0.1.7 (turbo dev)"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -75,6 +75,7 @@ func main() {
 	flag.BoolVar(&globalState.Cfg.ShowVersion, "version", false, "Show version number and exit")                                                                                                                                                                //todo: write test
 	flag.StringVar(&globalState.Cfg.Wordlist, "w", "", "Wordlist to use for bruteforce. Blank for spider only")                                                                                                                                                 //todo: write test
 	flag.StringVar(&globalState.Cfg.WhitelistLocation, "whitelist", "", "Whitelist of domains to include in brute-force")                                                                                                                                       //todo: write test
+	flag.BoolVar(&globalState.Cfg.Turbo, "T", false, "Use HTTP Pipelining to improve performance. No warranty, don't tell me if it breaks stuff.")
 
 	flag.Parse()
 

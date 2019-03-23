@@ -141,8 +141,8 @@ type State struct {
 	//Should probably have different concepts between config and state. Configs that might change depending on the URL being queried
 
 	//global State values
-	Client         *http.Client
-	BurpClient     *http.Client
+	Client         httpBoi //*http.Client
+	BurpClient     httpBoi //*http.Client
 	Cfg            *Config
 	TotalTested    *uint64
 	PerSecondShort *uint64 //how many tested over 2 seconds or so
@@ -303,6 +303,7 @@ type Config struct {
 	SSLIgnore         bool
 	Threads           int
 	Timeout           int
+	Turbo             bool
 	URL               string
 	VerboseLevel      int
 	Version           string
