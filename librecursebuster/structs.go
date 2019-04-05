@@ -306,6 +306,7 @@ type Config struct {
 	URL               string
 	VerboseLevel      int
 	Version           string
+	Vhost             string
 	WhitelistLocation string
 	Wordlist          string
 }

@@ -547,6 +547,22 @@ func TestGoodCodes(t *testing.T) {
 
 }
 
+func TestVHost(t *testing.T) {
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.Vhost = "vhost"
+	gState, urlSlice := preSetupTest(cfg, "2023", finished, t)
+	gState.WordList = append(gState.WordList, "vhost1")
+	found := postSetupTest(urlSlice, gState)
+	gState.Wait()
+
+	if x, ok := found["/vhost1"]; !ok || x == nil {
+		t.Error("Failed check 1, didn't find a path it should have")
+	}
+
+}
+
 func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Response) {
 	//start up the management goroutines
 	go gState.ManageRequests()

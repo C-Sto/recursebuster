@@ -233,6 +233,10 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 			bod = robotsBod
 		}
 	case "/robotsfolder/x":
+	case "/vhost1":
+		if r.Host == "vhost" {
+			respCode = 200
+		}
 
 	default:
 		respCode = 404

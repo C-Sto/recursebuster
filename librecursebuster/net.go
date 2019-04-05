@@ -100,6 +100,10 @@ func (gState *State) HTTPReq(method, path string, client *http.Client) (resp *ht
 			req.Header.Set(spl[0], spl[1])
 		}
 	}
+	if gState.Cfg.Vhost != "" {
+		req.Host = gState.Cfg.Vhost
+	}
+
 	resp, err = client.Do(req)
 	if err != nil {
 		return nil, err

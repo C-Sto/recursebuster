@@ -14,7 +14,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.6.9"
+const version = "1.6.10"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -72,6 +72,7 @@ func main() {
 	flag.StringVar(&globalState.Cfg.URL, "u", "", "Url to spider")                                                                                                                                                                                              //todo: write test
 	flag.StringVar(&globalState.Cfg.Agent, "ua", "RecurseBuster/"+version, "User agent to use when sending requests.")                                                                                                                                          //todo: write test
 	flag.IntVar(&globalState.Cfg.VerboseLevel, "v", 0, "Verbosity level for output messages.")                                                                                                                                                                  //todo: write test
+	flag.StringVar(&globalState.Cfg.Vhost, "vhost", "", "Vhost to send")                                                                                                                                                                                        //test written
 	flag.BoolVar(&globalState.Cfg.ShowVersion, "version", false, "Show version number and exit")                                                                                                                                                                //todo: write test
 	flag.StringVar(&globalState.Cfg.Wordlist, "w", "", "Wordlist to use for bruteforce. Blank for spider only")                                                                                                                                                 //todo: write test
 	flag.StringVar(&globalState.Cfg.WhitelistLocation, "whitelist", "", "Whitelist of domains to include in brute-force")                                                                                                                                       //todo: write test
