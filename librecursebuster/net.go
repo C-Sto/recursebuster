@@ -116,6 +116,8 @@ func (gState *State) HTTPReq(method, path string, client *http.Client) (resp *ht
 		return resp, err
 	}
 	resp.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	//when the transfer encoding was chunked - this caused the response length to be -1, breaking the soft 404 stuff. Honestly, the HTTP spec is a massive pain in the ass.
+	resp.ContentLength = int64(len(body))
 
 	return resp, err
 }
