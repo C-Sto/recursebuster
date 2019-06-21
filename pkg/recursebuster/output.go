@@ -1,4 +1,4 @@
-package librecursebuster
+package recursebuster
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/c-sto/recursebuster/pkg/consolewriter"
 	"github.com/jroimartin/gocui"
 )
 
@@ -105,7 +106,7 @@ func (gState *State) printBasedOnStatus(status int, printS string) {
 }
 
 //PrintOutput used to send output to the screen
-func (gState *State) PrintOutput(message string, writer *ConsoleWriter, verboseLevel int) {
+func (gState *State) PrintOutput(message string, writer *consolewriter.ConsoleWriter, verboseLevel int) {
 	gState.wg.Add(1)
 	gState.Chans.printChan <- OutLine{
 		Content: message,

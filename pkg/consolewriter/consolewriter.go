@@ -1,4 +1,4 @@
-package librecursebuster
+package consolewriter
 
 import (
 	"fmt"
