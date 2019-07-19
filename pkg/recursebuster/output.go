@@ -1,4 +1,4 @@
-package librecursebuster
+package recursebuster
 
 import (
 	"fmt"
@@ -8,34 +8,49 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/c-sto/recursebuster/pkg/consolewriter"
 	"github.com/jroimartin/gocui"
 )
 
-//PrintBanner prints the banner and in debug mode will also print all set options
-func (gState *State) PrintBanner() {
+//Banner returns the banner, in debug mode will also print all set options
+func (gState *State) Banner() string {
+	sb := strings.Builder{}
 	//todo: include settings in banner
 	if gState.Cfg.NoUI || gState.Cfg.ShowVersion {
-		fmt.Println(strings.Repeat("=", 20))
-		fmt.Println("recursebuster V" + gState.Cfg.Version)
-		fmt.Println("Poorly hacked together by C_Sto (@C__Sto)")
-		fmt.Println("Heavy influence from Gograbber, thx Swarlz")
-		fmt.Println(strings.Repeat("=", 20))
+		sb.WriteString(strings.Repeat("=", 20))
+		sb.WriteString("\n")
+		sb.WriteString("recursebuster V" + gState.Cfg.Version)
+		sb.WriteString("\n")
+		sb.WriteString("Poorly hacked together by C_Sto (@C__Sto)")
+		sb.WriteString("\n")
+		sb.WriteString("Heavy influence from Gograbber, thx Swarlz")
+		sb.WriteString("\n")
+		sb.WriteString(strings.Repeat("=", 20))
+		sb.WriteString("\n")
 		if gState.Cfg.Debug {
-			gState.printOpts()
-			fmt.Println(strings.Repeat("=", 20))
+			sb.WriteString(gState.printOpts())
+			sb.WriteString(strings.Repeat("=", 20))
+			sb.WriteString("\n")
 		}
 	}
+	return sb.String()
+}
+
+//PrintBanner writes the banner to stdout with 'fmt.Println'
+func (gState *State) PrintBanner() {
+	fmt.Println(gState.Banner())
 }
 
 //stolen from swarlz
-func (gState *State) printOpts() {
+func (gState *State) printOpts() string {
+	sb := strings.Builder{}
 	keys := reflect.ValueOf(gState.Cfg).Elem()
 	typeOfT := keys.Type()
 	for i := 0; i < keys.NumField(); i++ {
 		f := keys.Field(i)
-		Debug.Printf("%s: = %v\n", typeOfT.Field(i).Name, f.Interface())
+		sb.WriteString(fmt.Sprintf("%s: = %v\n", typeOfT.Field(i).Name, f.Interface()))
 	}
-
+	return sb.String()
 }
 
 //OutputWriter will write to a file and the screen
@@ -105,7 +120,7 @@ func (gState *State) printBasedOnStatus(status int, printS string) {
 }
 
 //PrintOutput used to send output to the screen
-func (gState *State) PrintOutput(message string, writer *ConsoleWriter, verboseLevel int) {
+func (gState *State) PrintOutput(message string, writer *consolewriter.ConsoleWriter, verboseLevel int) {
 	gState.wg.Add(1)
 	gState.Chans.printChan <- OutLine{
 		Content: message,
@@ -226,11 +241,12 @@ func (gState *State) StatusPrinter() {
 
 		if !gState.Cfg.NoStatus && gState.Cfg.NoUI {
 			//assemble the status string
-			sprint := fmt.Sprintf("%s"+black.Sprint(">"), status)
+			sb := strings.Builder{}
+			sb.WriteString(fmt.Sprintf("%s"+black.Sprint(">"), status))
 			//if gState.Cfg.MaxDirs == 1 && gState.Cfg.Wordlist != "" {
 			//this is the grossest format string I ever did see
 			if len(gState.WordList) > 0 {
-				sprint += fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(len(gState.WordList)), testedURL)
+				sb.WriteString(fmt.Sprintf("[%.2f%%%%]%s", 100*float64(atomic.LoadUint32(gState.DirbProgress))/float64(len(gState.WordList)), testedURL))
 			}
 			//} else {
 			//	sprint += fmt.Sprintf("%s", testedURL)
@@ -239,14 +255,14 @@ func (gState *State) StatusPrinter() {
 			//flush the line
 			fmt.Printf("\r%s\r", strings.Repeat(" ", spacesToClear))
 
-			Status.Printf(sprint + "\r")
+			Status.Print(sb.String() + "\r")
 			/*		v, err := gState.ui.View("Main")
 					if err != nil {
 						panic(err)
 					}
 					fmt.Fprintln(v, sprint+"\n")*/
 			//remember how many spaces we need to use to clear the line (21 for the date and time prefix)
-			spacesToClear = len(sprint) + 21
+			spacesToClear = len(sb.String()) + 21
 		}
 
 	}

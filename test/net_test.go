@@ -1,10 +1,12 @@
-package librecursebuster
+package test
 
 import (
 	"fmt"
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/c-sto/recursebuster/pkg/net"
 )
 
 func TestGetUrls(t *testing.T) {
@@ -17,7 +19,7 @@ func TestGetUrls(t *testing.T) {
 	<a href='http://test.com/hack/the/planet' >	
 	<a href="http://test.com/.git/config" >	
 	`
-	urls, e := getUrls([]byte(page))
+	urls, e := net.GetURLs([]byte(page))
 	if e != nil {
 		panic(e)
 	}
@@ -65,8 +67,8 @@ func TestCleanURL(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		fmt.Println(x, "H->"+u.Host, "P->"+u.Path)
-		result, err := url.Parse((cleanURL(u, "http://localhost")))
+		//fmt.Println(x, "H->"+u.Host, "P->"+u.Path)
+		result, err := url.Parse((net.CleanURL(u, "http://localhost")))
 		if err != nil {
 			t.Error(e)
 		}
@@ -75,31 +77,3 @@ func TestCleanURL(t *testing.T) {
 		}
 	}
 }
-
-/*
-
-func cleanURL(u *url.URL, actualURL string) string {
-	fmt.Println(u)
-	var didHaveSlash bool
-	if len(u.Path) > 0 {
-		didHaveSlash = string(u.Path[len(u.Path)-1]) == "/"
-		if string(u.Path[0]) != "/" {
-			u.Path = "/" + u.Path
-		}
-	}
-
-	cleaned := path.Clean(u.Path)
-
-	if string(cleaned[0]) != "/" {
-		cleaned = "/" + cleaned
-	}
-	if cleaned != "." {
-		actualURL += cleaned
-	}
-
-	if didHaveSlash && cleaned != "/" {
-		actualURL += "/"
-	}
-	return actualURL
-}
-*/

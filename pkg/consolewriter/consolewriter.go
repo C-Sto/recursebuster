@@ -1,4 +1,4 @@
-package librecursebuster
+package consolewriter
 
 import (
 	"fmt"
@@ -97,6 +97,15 @@ func (c *ConsoleWriter) Println(v ...interface{}) {
 // Arguments are handled in the manner of fmt.Printf.
 func (c *ConsoleWriter) Printf(format string, v ...interface{}) {
 	err := c.Output(2, fmt.Sprintf(format, v...))
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+// Print calls l.Output to print to the logger.
+// Arguments are handled in the manner of fmt.Print.
+func (c *ConsoleWriter) Print(v ...interface{}) {
+	err := c.Output(2, fmt.Sprint(v...))
 	if err != nil {
 		fmt.Println(err)
 	}

@@ -4,3 +4,4 @@ inlist.txt
 err.log
 no.log
 *.test
+.vscode/*

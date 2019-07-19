@@ -1,4 +1,4 @@
-package librecursebuster
+package test
 
 import (
 	"fmt"
@@ -9,7 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/c-sto/recursebuster/librecursebuster/testserver"
+	"github.com/c-sto/recursebuster/cmd"
+
+	"github.com/c-sto/recursebuster/pkg/recursebuster"
+
+	"github.com/c-sto/recursebuster/test/testserver"
 )
 
 const localURL = "http://localhost:"
@@ -142,7 +146,7 @@ func TestBadHeaders(t *testing.T) {
 	t.Parallel()
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
-	cfg.BadHeader = ArrayStringFlag{}
+	cfg.BadHeader = recursebuster.ArrayStringFlag{}
 	cfg.BadHeader.Set("X-Bad-Header: test123")
 	gState, urlSlice := preSetupTest(cfg, "2005", finished, t)
 	gState.WordList = append(gState.WordList, "badheader")
@@ -192,7 +196,7 @@ func TestBodyContent(t *testing.T) {
 	cfg.NoHead = true
 	gState, urlSlice := preSetupTest(cfg, "2007", finished, t)
 	gState.WordList = append(gState.WordList, "postbody")
-	gState.bodyContent = "test=bodycontent"
+	gState.BodyContent = "test=bodycontent"
 	gState.Cfg.BodyContent = "test"
 	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
@@ -322,7 +326,7 @@ func TestHeaders(t *testing.T) {
 	t.Parallel()
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
-	cfg.Headers = ArrayStringFlag{}
+	cfg.Headers = recursebuster.ArrayStringFlag{}
 	cfg.Headers.Set("X-ATT-DeviceId:XXXXX")
 	gState, urlSlice := preSetupTest(cfg, "2013", finished, t)
 	gState.WordList = append(gState.WordList, "customheaderonly")
@@ -563,11 +567,11 @@ func TestVHost(t *testing.T) {
 
 }
 
-func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Response) {
+func postSetupTest(urlSlice []string, gState *recursebuster.State) (found map[string]*http.Response) {
 	//start up the management goroutines
 	go gState.ManageRequests()
 	go gState.ManageNewURLs()
-	go gState.testWorker() //single thread only - todo: when doing multithread tests make this gooder
+	go gState.StartTestWorker() //single thread only - todo: when doing multithread tests make this gooder
 
 	//default turn url into a url object call
 	u, err := url.Parse(urlSlice[0])
@@ -586,10 +590,11 @@ func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Res
 	go gState.StartBusting(randURL, *u)
 
 	//start the print channel (so that we can see output if a test fails)
+	pc := gState.Chans.PrintChan()
 	go func() {
 		for {
-			p := <-gState.Chans.printChan
-			gState.wg.Done()
+			p := <-pc
+			gState.DoneWG()
 			if p.Content != "" {
 
 			}
@@ -599,19 +604,20 @@ func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Res
 
 	//use the found map to determine later on if we have found the expected URL's
 	found = make(map[string]*http.Response)
+	conf := gState.Chans.ConfirmedChan()
 	go func() {
 		t := time.NewTicker(1 * time.Second).C
 		for {
 			select {
-			case x := <-gState.Chans.confirmedChan:
+			case x := <-conf:
 
 				u, e := url.Parse(x.URL)
 				if e != nil {
-					gState.wg.Done()
+					gState.DoneWG()
 					panic(e)
 				}
 				found[u.Path] = x.Result
-				gState.wg.Done()
+				gState.DoneWG()
 				//fmt.Println("CONFIRMED!", x)
 			case <-t:
 				//fmt.Println(gState.wg)
@@ -621,11 +627,11 @@ func postSetupTest(urlSlice []string, gState *State) (found map[string]*http.Res
 	return
 }
 
-func preSetupTest(cfg *Config, servPort string, finished chan struct{}, t *testing.T) (stateObject *State, urlSlice []string) {
+func preSetupTest(cfg *recursebuster.Config, servPort string, finished chan struct{}, t *testing.T) (stateObject *recursebuster.State, urlSlice []string) {
 	//Test default functions. Basic dirb should work, and all files should be found as expected
 
 	//basic state setup
-	globalState := State{}.Init()
+	globalState := recursebuster.State{}.Init()
 	if cfg != nil {
 		globalState.Cfg = cfg
 	}
@@ -639,7 +645,7 @@ func preSetupTest(cfg *Config, servPort string, finished chan struct{}, t *testi
 	globalState.Cfg.URL = localURL + servPort
 
 	//default slice starter-upper
-	urlSlice = getURLSlice(globalState)
+	urlSlice = cmd.GetURLSlice(globalState)
 
 	//setup the config to default values
 	setupConfig(globalState, urlSlice[0], cfg)
@@ -665,8 +671,8 @@ z
 	return
 }
 
-func getDefaultConfig() *Config {
-	return &Config{
+func getDefaultConfig() *recursebuster.Config {
+	return &recursebuster.Config{
 		Version: "TEST",
 		ShowAll: false,
 
@@ -713,7 +719,7 @@ func getDefaultConfig() *Config {
 
 }
 
-func setupConfig(globalState *State, urlSliceZero string, cfg *Config) {
+func setupConfig(globalState *recursebuster.State, urlSliceZero string, cfg *recursebuster.Config) {
 
 	var h *url.URL
 	var err error
@@ -735,6 +741,6 @@ func setupConfig(globalState *State, urlSliceZero string, cfg *Config) {
 	globalState.Hosts.AddHost(h)
 
 	if globalState.Cfg.Canary == "" {
-		globalState.Cfg.Canary = RandString()
+		globalState.Cfg.Canary = recursebuster.RandString()
 	}
 }

@@ -1,121 +1,97 @@
-package librecursebuster
+package ui
 
 import (
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
+
+	"github.com/c-sto/recursebuster/pkg/recursebuster"
 
 	ui "github.com/jroimartin/gocui"
 )
 
+var version = "UNSET"
+
 //StartUI is called to begin the UI... stuff
-func (s *State) StartUI(uiWG *sync.WaitGroup, quitChan chan struct{}) {
+func StartUI(uiWG *sync.WaitGroup, quitChan chan struct{}, s *recursebuster.State) {
+	version = s.Cfg.Version
 	g, err := ui.NewGui(ui.OutputNormal)
 	if err != nil {
 		panic(err)
 	}
-	s.ui = g
+	//s.ui
+	s.SetUI(g)
 	defer func() {
-		s.StopUI()
+		StopUI(g)
 		close(quitChan)
 	}()
-	s.ui.SetManagerFunc(s.layout)
+	g.SetManagerFunc(layout)
 
-	err = s.ui.SetKeybinding("", ui.KeyCtrlX, ui.ModNone, s.handleX)
-	if err != nil {
-		panic(err)
-	}
-
-	err = s.ui.SetKeybinding("", ui.KeyCtrlC, ui.ModNone, s.quit)
+	err = g.SetKeybinding("", ui.KeyCtrlX, ui.ModNone, s.HandleX)
 	if err != nil {
 		panic(err)
 	}
 
-	err = s.ui.SetKeybinding("", ui.KeyPgup, ui.ModNone, pgUp)
-	if err != nil {
-		panic(err)
-	}
-	err = s.ui.SetKeybinding("", ui.KeyPgdn, ui.ModNone, pgDown)
-	if err != nil {
-		panic(err)
-	}
-	err = s.ui.SetKeybinding("", ui.KeyArrowUp, ui.ModNone, scrollUp)
-	if err != nil {
-		panic(err)
-	}
-	err = s.ui.SetKeybinding("", ui.KeyArrowDown, ui.ModNone, scrollDown)
+	err = g.SetKeybinding("", ui.KeyCtrlC, ui.ModNone, quit)
 	if err != nil {
 		panic(err)
 	}
 
-	err = s.ui.SetKeybinding("", ui.KeyCtrlT, ui.ModNone, s.addWorker)
+	err = g.SetKeybinding("", ui.KeyPgup, ui.ModNone, pgUp)
+	if err != nil {
+		panic(err)
+	}
+	err = g.SetKeybinding("", ui.KeyPgdn, ui.ModNone, pgDown)
+	if err != nil {
+		panic(err)
+	}
+	err = g.SetKeybinding("", ui.KeyArrowUp, ui.ModNone, scrollUp)
+	if err != nil {
+		panic(err)
+	}
+	err = g.SetKeybinding("", ui.KeyArrowDown, ui.ModNone, scrollDown)
 	if err != nil {
 		panic(err)
 	}
 
-	err = s.ui.SetKeybinding("", ui.KeyCtrlY, ui.ModNone, s.stopWorker) //wtf? no shift modifier??
+	err = g.SetKeybinding("", ui.KeyCtrlT, ui.ModNone, s.AddWorker)
+	if err != nil {
+		panic(err)
+	}
+
+	err = g.SetKeybinding("", ui.KeyCtrlY, ui.ModNone, s.StopWorker) //wtf? no shift modifier??
 	if err != nil {
 		panic(err)
 	}
 	/* Mouse stuff broke copying out of the terminal... not ideal
 	err = s.ui.SetKeybinding("", ui.MouseWheelUp, ui.ModNone, scrollUp)
 	if err != nil {
-		panic(err)
+		panic(err
 	}
 	err = s.ui.SetKeybinding("", ui.MouseWheelDown, ui.ModNone, scrollDown)
 	if err != nil {
 		panic(err)
 	}*/
 	uiWG.Done()
-	err = s.ui.MainLoop()
+	err = g.MainLoop()
 	if err != nil && err != ui.ErrQuit {
 		panic(err)
 	}
 }
 
-func (s *State) addWorker(g *ui.Gui, v *ui.View) error {
-	atomic.AddUint32(s.workerCount, 1)
-	go s.testWorker()
-	return nil
-}
-
-func (s *State) stopWorker(g *ui.Gui, v *ui.View) error {
-	count := atomic.LoadUint32(s.workerCount)
-	if count == 0 { //avoid underflow
-		return nil
-	}
-	count = count - 1
-	atomic.StoreUint32(s.workerCount, count)
-	s.Chans.lessWorkersChan <- struct{}{}
-	return nil
-}
-
 //StopUI should be called when closing the program. It prints out the lines in the main view buffer to stdout, and closes the ui object
-func (s *State) StopUI() {
-	p, _ := s.ui.View("Main")
+func StopUI(u *ui.Gui) {
+	p, _ := u.View("Main")
 	lines := p.ViewBuffer()
-	s.ui.Close()
+	u.Close()
 	fmt.Print(lines)
 }
 
-func (s *State) handleX(g *ui.Gui, v *ui.View) error {
-	//vi, _ := g.View("Main")
-	//close(s.StopDir)
-	select { //lol dope hack to stop it blocking
-	case s.StopDir <- struct{}{}:
-	default:
-	}
-	//s.StopDir <- struct{}{}
-	//fmt.Fprintln(v, "X!!!")
-	return nil
-}
-
-func (s *State) quit(g *ui.Gui, v *ui.View) error {
+func quit(g *ui.Gui, v *ui.View) error {
 	return ui.ErrQuit
 }
 
-func (s *State) layout(g *ui.Gui) error {
+func layout(g *ui.Gui) error {
 	mX, mY := g.Size()
 	v, err := g.SetView("Main", 0, 0, mX-1, mY-7)
 	if err != nil && err != ui.ErrUnknownView {
@@ -127,7 +103,7 @@ func (s *State) layout(g *ui.Gui) error {
 		// Set autoscroll to normal again.
 		v.Autoscroll = true
 	}
-	v.Title = "~Recursebuster V" + s.Version + " by C_Sto (@C__Sto)~"
+	v.Title = "~Recursebuster V" + version + " by C_Sto (@C__Sto)~"
 	_, err = g.SetView("Status", 0, mY-6, mX-1, mY-1)
 	if err != nil && err != ui.ErrUnknownView {
 		return err

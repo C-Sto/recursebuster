@@ -2,30 +2,26 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"net/http"
-	_ "net/http/pprof"
-	"net/url"
 	"os"
 	"runtime"
-	"sync"
 
-	"github.com/c-sto/recursebuster/librecursebuster"
+	"github.com/c-sto/recursebuster/cmd/cli"
+	"github.com/c-sto/recursebuster/pkg/recursebuster"
 	"github.com/fatih/color"
 )
 
-const version = "1.6.11"
+const version = "1.6.12"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
 		//can't use color.Error, because *nix etc don't have that for some reason :(
-		librecursebuster.InitLogger(color.Output, color.Output, color.Output, color.Output, color.Output, color.Output, color.Output, color.Output, color.Output, color.Output)
+		recursebuster.InitLogger(color.Output, color.Output, color.Output, color.Output, color.Output, color.Output, color.Output, color.Output, color.Output, color.Output)
 	} else {
-		librecursebuster.InitLogger(os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stderr)
+		recursebuster.InitLogger(os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stderr)
 	}
 
 	//the state should probably change per different host. eventually
-	globalState := librecursebuster.State{}.Init()
+	globalState := recursebuster.State{}.Init()
 	globalState.Hosts.Init() //**
 
 	globalState.Cfg.Version = version //**
@@ -79,130 +75,5 @@ func main() {
 
 	flag.Parse()
 
-	if globalState.Cfg.ShowVersion {
-		globalState.PrintBanner()
-		os.Exit(0)
-	}
-
-	if globalState.Cfg.URL == "" && globalState.Cfg.InputList == "" {
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	urlSlice := getURLSlice(globalState)
-
-	setupConfig(globalState, urlSlice[0])
-
-	globalState.SetupState()
-
-	//do first load of urls (send canary requests to make sure we can dirbust them)
-	quitChan := make(chan struct{})
-	if !globalState.Cfg.NoUI {
-		uiWG := &sync.WaitGroup{}
-		uiWG.Add(1)
-		go uiQuit(quitChan)
-		go globalState.StartUI(uiWG, quitChan)
-		uiWG.Wait()
-	}
-
-	globalState.StartManagers()
-
-	globalState.PrintOutput("Starting recursebuster...", librecursebuster.Info, 0)
-
-	//seed the workers
-	for _, s := range urlSlice {
-		u, err := url.Parse(s)
-		if err != nil {
-			panic(err)
-		}
-
-		if u.Scheme == "" {
-			if globalState.Cfg.HTTPS {
-				u, err = url.Parse("https://" + s)
-			} else {
-				u, err = url.Parse("http://" + s)
-			}
-		}
-		if err != nil {
-			//this should never actually happen
-			panic(err)
-		}
-
-		//do canary etc
-
-		prefix := u.String()
-		if len(prefix) > 0 && string(prefix[len(prefix)-1]) != "/" {
-			prefix = prefix + "/"
-		}
-		randURL := fmt.Sprintf("%s%s", prefix, globalState.Cfg.Canary)
-		//globalState.Chans.GetWorkers() <- struct{}{}
-		globalState.AddWG()
-		go globalState.StartBusting(randURL, *u)
-
-	}
-
-	//wait for completion
-	globalState.Wait()
-
-}
-
-func getURLSlice(globalState *librecursebuster.State) []string {
-	urlSlice := []string{}
-	if globalState.Cfg.URL != "" {
-		urlSlice = append(urlSlice, globalState.Cfg.URL)
-	}
-
-	if globalState.Cfg.InputList != "" { //can have both -u flag and -iL flag
-		//must be using an input list
-		URLList := make(chan string, 10)
-		go librecursebuster.LoadWords(globalState.Cfg.InputList, URLList)
-		for x := range URLList {
-			//ensure all urls will parse good
-			_, err := url.Parse(x)
-			if err != nil {
-				panic("URL parse fail: " + err.Error())
-			}
-			urlSlice = append(urlSlice, x)
-			//globalState.Whitelist[u.Host] = true
-		}
-	}
-
-	return urlSlice
-}
-
-func uiQuit(quitChan chan struct{}) {
-	<-quitChan
-	os.Exit(0)
-}
-
-func setupConfig(globalState *librecursebuster.State, urlSliceZero string) {
-	if globalState.Cfg.Debug {
-		go func() {
-			http.ListenAndServe("localhost:6061", http.DefaultServeMux)
-		}()
-	}
-
-	var h *url.URL
-	var err error
-	h, err = url.Parse(urlSliceZero)
-	if err != nil {
-		panic(err)
-	}
-
-	if h.Scheme == "" {
-		if globalState.Cfg.HTTPS {
-			h, err = url.Parse("https://" + urlSliceZero)
-		} else {
-			h, err = url.Parse("http://" + urlSliceZero)
-		}
-	}
-	if err != nil {
-		panic(err)
-	}
-	globalState.Hosts.AddHost(h)
-
-	if globalState.Cfg.Canary == "" {
-		globalState.Cfg.Canary = librecursebuster.RandString()
-	}
-
+	cli.Run(globalState)
 }
