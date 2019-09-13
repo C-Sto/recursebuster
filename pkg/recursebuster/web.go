@@ -54,6 +54,12 @@ func (gState *State) evaluateURL(method string, urlString string, client *http.C
 		return headResp, content, false
 	}
 	content, err = ioutil.ReadAll(headResp.Body)
+
+	if gState.Cfg.BadBod != "" {
+		if bytes.Contains(content, []byte(gState.Cfg.BadBod)) {
+			return headResp, content, false
+		}
+	}
 	if err != nil {
 		gState.PrintOutput(fmt.Sprintf("%s", err), Error, 0)
 		return headResp, content, false

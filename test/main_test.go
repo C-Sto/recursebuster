@@ -9,8 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/c-sto/recursebuster/cmd"
-
+	"github.com/c-sto/recursebuster/cmd/cli"
 	"github.com/c-sto/recursebuster/pkg/recursebuster"
 
 	"github.com/c-sto/recursebuster/test/testserver"
@@ -567,6 +566,22 @@ func TestVHost(t *testing.T) {
 
 }
 
+func TestBadBod(t *testing.T) {
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	cfg.BadBod = "F5 Blocked"
+	gState, urlSlice := preSetupTest(cfg, "2024", finished, t)
+	gState.WordList = append(gState.WordList, "badbod")
+	found := postSetupTest(urlSlice, gState)
+	gState.Wait()
+
+	if x, ok := found["/badbod"]; ok || x != nil {
+		t.Error(fmt.Sprintf("Failed test, did not expect to find %s", "/badbod"))
+	}
+
+}
+
 func postSetupTest(urlSlice []string, gState *recursebuster.State) (found map[string]*http.Response) {
 	//start up the management goroutines
 	go gState.ManageRequests()
@@ -645,7 +660,7 @@ func preSetupTest(cfg *recursebuster.Config, servPort string, finished chan stru
 	globalState.Cfg.URL = localURL + servPort
 
 	//default slice starter-upper
-	urlSlice = cmd.GetURLSlice(globalState)
+	urlSlice = cli.GetURLSlice(globalState)
 
 	//setup the config to default values
 	setupConfig(globalState, urlSlice[0], cfg)

@@ -60,6 +60,7 @@ const bod200 = `200ish response! This should be different enough that it is not 
 const bodNeither = `Totally different response indicating something interesting, but probably not a 404`
 const bodCanary1 = `Definitely a Canary response, should be sent with 404 for the canary value`
 const bodCanary2 = `similar to a Canary response, should be sent with 200 for the canary value`
+const bod200_bad = `200ish response! This should be different enough that it is not detected as being a soft 404, ideally anyway. F5 Blocked`
 
 const robotsBod = `
 User-agent: Googlebot 
@@ -237,7 +238,9 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 		if r.Host == "vhost" {
 			respCode = 200
 		}
-
+	case "/badbod":
+		respCode = 200
+		bod = bod200_bad
 	default:
 		respCode = 404
 	}
