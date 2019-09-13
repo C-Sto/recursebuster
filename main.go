@@ -10,7 +10,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "1.6.12"
+const version = "1.6.13"
 
 func main() {
 	if runtime.GOOS == "windows" { //lol goos
@@ -33,7 +33,8 @@ func main() {
 	flag.StringVar(&globalState.Cfg.Auth, "auth", "", "Basic auth. Supply this with the base64 encoded portion to be placed after the word 'Basic' in the Authorization header.") //Test Written
 	flag.StringVar(&globalState.Cfg.BadResponses, "bad", "404", "Responses to consider 'bad' or 'not found'. Comma-separated. This works the opposite way of gobuster!")          //Test Written
 	flag.StringVar(&globalState.Cfg.GoodResponses, "good", "", "Whitelist of response codes to consider good. If this flag is used, ONLY the provided codes will be considered 'good'.")
-	flag.Var(&globalState.Cfg.BadHeader, "badheader", "Check for presence of this header. If an prefix match is found, the response is considered bad.Supply as key:value. Can specify multiple - eg '-badheader Location:cats -badheader X-ATT-DeviceId:XXXXX'")                                                 //Test Written
+	flag.Var(&globalState.Cfg.BadHeader, "badheader", "Check for presence of this header. If an prefix match is found, the response is considered bad.Supply as key:value. Can specify multiple - eg '-badheader Location:cats -badheader X-ATT-DeviceId:XXXXX'") //Test Written
+	flag.StringVar(&globalState.Cfg.BadBod, "badbod", "", "Body value to look for to consider the response 'bad'.")
 	flag.StringVar(&globalState.Cfg.BodyContent, "body", "", "File containing content to send in the body of the request. Content-length header will be set accordingly. Note: HEAD requests will/should fail (server will reply with a 400). Set the '-nohead' option to prevent HEAD being sent before a GET.") //Test Written
 	flag.StringVar(&globalState.Cfg.BlacklistLocation, "blacklist", "", "Blacklist of prefixes to not check. Will not check on exact matches.")                                                                                                                                                                   //Test Written
 	flag.StringVar(&globalState.Cfg.Canary, "canary", "", "Custom value to use to check for wildcards")                                                                                                                                                                                                           //Test Written

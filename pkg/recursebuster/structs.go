@@ -754,6 +754,7 @@ type Config struct {
 	AppendDir         bool
 	Auth              string
 	BadResponses      string
+	BadBod            string
 	GoodResponses     string
 	BadHeader         ArrayStringFlag
 	BodyContent       string
