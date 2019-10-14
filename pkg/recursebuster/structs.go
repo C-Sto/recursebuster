@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -554,7 +555,20 @@ func (gState *State) getRobots(u url.URL) {
 		gState.PrintOutput("Robots Error: \n"+err.Error(), Error, 1)
 		return
 	}
+	// Check that the file is actually a plaintext robots.txt and not a soft404
+	re, err := regexp.Compile(`(?i)<\s?html\s?>`)
+	if err != nil {
+		gState.PrintOutput("Robots Error: \n"+err.Error(), Error, 1)
+		return
+	}
+	if re.Match(content) {
+		// Soft404 or some other dodgy robots.txt discovered
+		gState.PrintOutput("Robots Error: \n"+"Unexpected robots.txt content (contained html?)", Error, 1)
+		return
+	}
+
 	//parse robots.txt
+
 	contents := strings.Split(string(content), "\n")
 	for _, line := range contents {
 		//split into parts
