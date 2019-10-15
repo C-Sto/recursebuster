@@ -582,6 +582,20 @@ func TestBadBod(t *testing.T) {
 
 }
 
+func TestBadRobotsBod(t *testing.T) {
+	t.Parallel()
+	finished := make(chan struct{})
+	cfg := getDefaultConfig()
+	gState, urlSlice := preSetupTest(cfg, "2025", finished, t)
+	gState.WordList = append(gState.WordList, "badrobots.txt")
+	found := postSetupTest(urlSlice, gState)
+	gState.Wait()
+	if x, ok := found["/badrobots.txt"]; ok || x != nil {
+		t.Error(fmt.Sprintf("Failed test, did not expect to find %s", "/badrobots.txt (bad body contents)"))
+	}
+
+}
+
 func postSetupTest(urlSlice []string, gState *recursebuster.State) (found map[string]*http.Response) {
 	//start up the management goroutines
 	go gState.ManageRequests()
