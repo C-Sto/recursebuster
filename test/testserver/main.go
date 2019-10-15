@@ -279,15 +279,16 @@ func (ts *TestServer) handler(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "HEAD" {
 			respCode = 200
 		}
-	case "/badrobots.txt":
-		if r.Method == "GET" {
-			respCode = 200
-			bod = badRobotsBod
-		}
 	case "/robots.txt":
-		if r.Method == "GET" {
+		if r.Header.Get("badrobotman") == "lol" {
+			bod = badRobotsBod
 			respCode = 200
+			break
+		}
+		if r.Method == "GET" {
 			bod = robotsBod
+			respCode = 200
+			break
 		}
 	case "/robotsfolder/x":
 	case "/vhost1":
