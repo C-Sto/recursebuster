@@ -555,7 +555,6 @@ func (gState *State) getRobots(u url.URL) {
 		gState.PrintOutput("Robots Error: \n"+err.Error(), Error, 1)
 		return
 	}
-
 	// Check that the file is actually a plaintext robots.txt and not a soft404
 	re, err := regexp.Compile(`(?i)<\s?html\s?>`)
 	if err != nil {
@@ -568,6 +567,7 @@ func (gState *State) getRobots(u url.URL) {
 		return
 	}
 	//parse robots.txt
+
 	contents := strings.Split(string(content), "\n")
 	for _, line := range contents {
 		//split into parts
