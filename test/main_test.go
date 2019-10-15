@@ -587,7 +587,7 @@ func TestBadRobotsBod(t *testing.T) {
 	finished := make(chan struct{})
 	cfg := getDefaultConfig()
 	cfg.Headers = recursebuster.ArrayStringFlag{}
-	cfg.Headers.Set("badrobotman:lol")
+	cfg.Headers.Set("badrobotman: lol")
 	gState, urlSlice := preSetupTest(cfg, "2025", finished, t)
 	found := postSetupTest(urlSlice, gState)
 	gState.Wait()
